@@ -1,0 +1,45 @@
+{
+  "name": "nest-dto-generator",
+  "displayName": "NestJS DTO Generator",
+  "description": "Generate Swagger DTOs from TypeORM entities",
+  "version": "1.0.0",
+  "publisher": "tu-nombre",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:nest-dto-generator.generateDto"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "nest-dto-generator.generateDto",
+        "title": "Generate Swagger DTO",
+        "category": "NestJS"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "nest-dto-generator.generateDto",
+          "when": "resourceLangId == typescript",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.60.0",
+    "@types/node": "16.x",
+    "typescript": "^4.9.4"
+  }
+}
