@@ -3,14 +3,13 @@ import * as path from "path";
 import * as fs from "fs";
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log("✅ NestJS DTO Generator activado");
+  console.log("✅ NestJS DTO & CRUD Generator activado");
 
-  let disposable = vscode.commands.registerCommand(
+  const dtoDisposable = vscode.commands.registerCommand(
     "nest-dto-generator.generateDto",
     async (uri?: vscode.Uri) => {
       try {
         const targetUri = uri || vscode.window.activeTextEditor?.document.uri;
-
         if (!targetUri) {
           vscode.window.showErrorMessage(
             "No hay archivo seleccionado. Haz clic derecho sobre un archivo .entity.ts"
@@ -18,262 +17,291 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        const entityPath = targetUri.fsPath;
-
-        if (!entityPath.endsWith(".entity.ts")) {
+        if (!targetUri.fsPath.endsWith(".entity.ts")) {
           vscode.window.showWarningMessage(
             "Este comando solo funciona con archivos .entity.ts"
           );
           return;
         }
 
-        await generateDtoFromEntity(entityPath);
-      } catch (error) {
-        vscode.window.showErrorMessage(`Error generating DTO: ${error}`);
+        await generateDto(targetUri.fsPath);
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Error generando DTO: ${err.message}`);
       }
     }
   );
 
-  context.subscriptions.push(disposable);
+  const crudDisposable = vscode.commands.registerCommand(
+    "nest-dto-generator.generateCrud",
+    async (uri?: vscode.Uri) => {
+      try {
+        const targetUri = uri || vscode.window.activeTextEditor?.document.uri;
+        if (!targetUri) {
+          vscode.window.showErrorMessage(
+            "No hay archivo seleccionado. Haz clic derecho sobre un archivo .entity.ts"
+          );
+          return;
+        }
+
+        if (!targetUri.fsPath.endsWith(".entity.ts")) {
+          vscode.window.showWarningMessage(
+            "Este comando solo funciona con archivos .entity.ts"
+          );
+          return;
+        }
+
+        await generateCrud(targetUri.fsPath);
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Error generando CRUD: ${err.message}`);
+      }
+    }
+  );
+
+  context.subscriptions.push(dtoDisposable, crudDisposable);
 }
 
-async function generateDtoFromEntity(entityPath: string) {
-  if (!fs.existsSync(entityPath)) {
-    vscode.window.showErrorMessage(`Archivo no encontrado: ${entityPath}`);
-    return;
-  }
-
+async function generateDto(entityPath: string) {
   const entityContent = fs.readFileSync(entityPath, "utf8");
   const entityName = path.basename(entityPath, ".entity.ts");
   const dtoName = `${entityName.replace(/Entity$/, "")}Dto`;
 
-  const dtoContent = parseEntityAndGenerateDto(entityContent, dtoName);
+  const properties = parseEntityProperties(entityContent);
+  const dtoContent = generateDtoContent(dtoName, properties);
 
-  const dtoPath = entityPath.replace(".entity.ts", ".dto.ts");
+  // Carpeta dto al mismo nivel que el módulo
+  const folder = path.dirname(entityPath);
+  const dtoFolder = path.join(folder, "..", "dto");
+  fs.mkdirSync(dtoFolder, { recursive: true });
 
-  if (fs.existsSync(dtoPath)) {
-    const overwrite = await vscode.window.showWarningMessage(
-      `El archivo ${path.basename(dtoPath)} ya existe. ¿Sobrescribir?`,
-      "Sí",
-      "No"
-    );
-
-    if (overwrite !== "Sí") return;
-  }
-
-  fs.writeFileSync(dtoPath, dtoContent);
-  vscode.window.showInformationMessage(
-    `DTO generado: ${path.basename(dtoPath)}`
-  );
-
-  const document = await vscode.workspace.openTextDocument(dtoPath);
-  await vscode.window.showTextDocument(document);
+  const dtoPath = path.join(dtoFolder, `${dtoName}.ts`);
+  await writeFileSafely(dtoPath, dtoContent, "DTO generado");
 }
 
-// Convertir nombres con guiones o snake_case a camelCase
-function toCamelCase(name: string): string {
-  return name
-    .replace(/-([a-z])/g, (_, char) => char.toUpperCase())
-    .replace(/_([a-z])/g, (_, char) => char.toUpperCase());
+async function generateCrud(entityPath: string) {
+  const entityContent = fs.readFileSync(entityPath, "utf8");
+  const entityName = path.basename(entityPath, ".entity.ts");
+  const pascalEntity = entityName.replace(/\.entity$/i, "");
+  const camelEntity = toCamelCase(pascalEntity);
+
+  // Carpeta base del módulo (fuera de entities)
+  const moduleFolder = path.dirname(path.dirname(entityPath));
+  const repoFolder = path.join(moduleFolder, "repositories");
+  const serviceFolder = path.join(moduleFolder, "services");
+
+  fs.mkdirSync(repoFolder, { recursive: true });
+  fs.mkdirSync(serviceFolder, { recursive: true });
+
+  // Repository
+  const repoPath = path.join(repoFolder, `${pascalEntity}.repository.ts`);
+  const repoContent = generateRepositoryContent(camelEntity, pascalEntity);
+  await writeFileSafely(repoPath, repoContent, "Repository generado");
+
+  // Service
+  const servicePath = path.join(serviceFolder, `${pascalEntity}.service.ts`);
+  const serviceContent = generateServiceContent(camelEntity, pascalEntity);
+  await writeFileSafely(servicePath, serviceContent, "Service generado");
+}
+
+function toCamelCase(str: string): string {
+  return str
+    .replace(/[-_\s]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ""))
+    .replace(/^[A-Z]/, (match) => match.toLowerCase());
 }
 
 interface PropertyInfo {
   name: string;
   type: string;
   isOptional: boolean;
+  isRelationId?: boolean;
   description?: string;
-  isRelation?: boolean;
-  relationType?: string;
 }
 
-function parseEntityAndGenerateDto(entityContent: string, dtoName: string): string {
+function parseEntityProperties(entityContent: string): PropertyInfo[] {
   const lines = entityContent.split("\n");
   const properties: PropertyInfo[] = [];
   let currentComment = "";
-  let pendingRelationType: string | undefined;
 
   for (const line of lines) {
-    const trimmedLine = line.trim();
+    const trimmed = line.trim();
 
-    // Comentarios de una línea
-    if (trimmedLine.startsWith("//")) {
-      currentComment += trimmedLine.substring(2).trim() + " ";
+    // Comentarios
+    if (trimmed.startsWith("//")) {
+      currentComment += trimmed.substring(2).trim() + " ";
       continue;
     }
 
-    // Comentarios /** ... */
-    const multiLineCommentMatch = trimmedLine.match(/\/\*\*(.*?)\*\//);
-    if (multiLineCommentMatch) {
-      currentComment += multiLineCommentMatch[1].trim() + " ";
-      continue;
-    }
-
-    // Detectar relaciones
-    const relationMatch = trimmedLine.match(/@(ManyToOne|OneToOne)\((?:\(\)\s*=>\s*(\w+))?/);
+    // Relaciones @ManyToOne/@OneToOne/@ManyToMany
+    const relationMatch = trimmed.match(
+      /@(ManyToOne|OneToOne|ManyToMany)\(([^)]*)\)\s*(\w+)?\s*:/
+    );
     if (relationMatch) {
-      pendingRelationType = relationMatch[2];
-      continue;
-    }
-
-    // Saltar líneas vacías
-    if (trimmedLine === "") {
+      const [, , , name] = relationMatch;
+      const propName = toCamelCase((name || "relation") + "Id");
+      properties.push({
+        name: propName,
+        type: "number",
+        isRelationId: true,
+        description: currentComment.trim() || undefined,
+        isOptional: true,
+      });
       currentComment = "";
       continue;
     }
 
-    // Detectar propiedades
-    const propertyMatch = trimmedLine.match(/^(\w+)\??:\s*([^;=]+)(?:\s*=.*?)?;/);
-    if (propertyMatch && !trimmedLine.startsWith("@")) {
-      let [, propertyName, propertyType] = propertyMatch;
+    // Propiedades normales
+    const propMatch = trimmed.match(/^(\w+)\??:\s*([^;]+);/);
+    if (propMatch) {
+      let [, name, type] = propMatch;
+      if (name === "id") continue;
 
-      // Saltar id
-      if (propertyName === "id") {
-        currentComment = "";
-        continue;
-      }
-
-      const isOptional = propertyName.endsWith("?");
-      propertyName = toCamelCase(propertyName.replace("?", ""));
-      propertyType = propertyType.trim();
-
-      if (pendingRelationType) {
-        // Crear propiedad de relación como RelacionId
-        properties.push({
-          name: propertyName + "Id",
-          type: "number",
-          isOptional,
-          description: currentComment.trim() || `${pendingRelationType} ID`,
-          isRelation: true,
-          relationType: pendingRelationType,
-        });
-        pendingRelationType = undefined;
-      } else {
-        properties.push({
-          name: propertyName,
-          type: propertyType,
-          isOptional,
-          description: currentComment.trim() || undefined,
-        });
-      }
-
+      const camelName = toCamelCase(name);
+      properties.push({
+        name: camelName,
+        type: type.trim(),
+        isOptional: name.endsWith("?"),
+        description: currentComment.trim() || undefined,
+      });
       currentComment = "";
     }
 
-    if (
-      trimmedLine.startsWith("export class") ||
-      trimmedLine.startsWith("@Entity") ||
-      trimmedLine.startsWith("@Column") ||
-      trimmedLine.startsWith("@Primary")
-    ) {
+    if (trimmed.startsWith("@") || trimmed.startsWith("export class")) {
       currentComment = "";
     }
   }
 
-  return generateDtoContent(dtoName, properties);
+  return properties;
 }
 
-function generateDtoContent(dtoName: string, properties: PropertyInfo[]): string {
-  const imports = new Set<string>();
-  imports.add("ApiProperty");
-
-  let content = `import { ApiProperty${
-    properties.some((p) => p.isOptional) ? ", ApiPropertyOptional" : ""
-  } } from '@nestjs/swagger';\n`;
-
-  properties.forEach((prop) => {
-    const validators = getValidatorsForType(prop.type, prop.isOptional);
-    validators.forEach((v) => imports.add(v));
-  });
-
-  const validatorImports = Array.from(imports)
-    .filter((imp) => imp.startsWith("Is") || imp === "ArrayNotEmpty")
-    .sort();
-
-  if (validatorImports.length > 0) {
-    content += `import { ${validatorImports.join(", ")} } from 'class-validator';\n`;
-  }
-
-  content += `\nexport class ${dtoName} {\n`;
+function generateDtoContent(
+  dtoName: string,
+  properties: PropertyInfo[]
+): string {
+  let content = `import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';\n`;
+  content += `import { IsNotEmpty, IsOptional, IsString, IsNumber, IsBoolean, IsDate, IsArray, ArrayNotEmpty } from 'class-validator';\n\n`;
+  content += `export class ${dtoName} {\n`;
 
   for (const prop of properties) {
-    const decorators = generateDecorators(prop);
-    content += `\n`;
-    if (decorators.validators) content += `  ${decorators.validators}\n`;
-    content += `  ${decorators.apiProperty}\n`;
-    const typeMapping = mapTypeToDto(prop.type);
-    content += `  ${prop.name}${prop.isOptional ? "?" : ""}: ${typeMapping.dtoType};\n`;
+    const decorators: string[] = [];
+
+    if (prop.isOptional) decorators.push("@IsOptional()");
+    else decorators.push("@IsNotEmpty()");
+
+    if (prop.type === "string") decorators.push("@IsString()");
+    else if (prop.type === "number") decorators.push("@IsNumber()");
+    else if (prop.type === "boolean") decorators.push("@IsBoolean()");
+    else if (prop.type === "Date") decorators.push("@IsDate()");
+
+    if (prop.type.endsWith("[]")) {
+      decorators.push("@IsArray()");
+      decorators.push("@ArrayNotEmpty()");
+    }
+
+    const apiDecorator = prop.isOptional
+      ? "ApiPropertyOptional"
+      : "ApiProperty";
+    const apiOptions = [`type: () => ${prop.type.replace("[]", "")}`];
+    if (prop.description) apiOptions.push(`description: '${prop.description}'`);
+    decorators.push(`@${apiDecorator}({ ${apiOptions.join(", ")} })`);
+
+    content += "  " + decorators.join("\n  ") + `\n`;
+    content += `  ${prop.name}${prop.isOptional ? "?" : ""}: ${prop.type};\n\n`;
   }
 
   content += `}\n`;
-
   return content;
 }
 
-function generateDecorators(prop: PropertyInfo): { apiProperty: string; validators: string } {
-  const typeMapping = mapTypeToDto(prop.type);
-  const decoratorName = prop.isOptional ? "ApiPropertyOptional" : "ApiProperty";
+function generateRepositoryContent(
+  pascalEntity: string,
+  camelEntity: string
+): string {
+  return `import { Repository, DataSource } from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import { ${pascalEntity} } from '../entities/${camelEntity}.entity';
+import { PaginatedResponseDto } from "@/common/dto/generic-response.dto";
 
-  let apiProperty = `@${decoratorName}({`;
-  const apiOptions: string[] = [];
-
-  if (prop.description) apiOptions.push(`description: '${prop.description.replace(/'/g, "\\'")}'`);
-  apiOptions.push(`type: () => ${typeMapping.swaggerType}`);
-  if (!prop.isOptional) apiOptions.push(`required: true`);
-  if (typeMapping.example) apiOptions.push(`example: ${typeMapping.example}`);
-
-  apiProperty += apiOptions.join(", ") + " })";
-
-  const validators = getValidatorsForType(prop.type, prop.isOptional);
-  const validatorsString = validators.map((v) => `@${v}()`).join("\n  ");
-
-  return { apiProperty, validators: validatorsString };
-}
-
-function getValidatorsForType(type: string, isOptional: boolean): string[] {
-  const validators: string[] = [];
-  const isArray = type.endsWith("[]");
-  const baseType = isArray ? type.slice(0, -2) : type;
-
-  if (!isOptional) {
-    if (isArray) validators.push("ArrayNotEmpty");
-    else validators.push("IsNotEmpty");
-  } else validators.push("IsOptional");
-
-  if (isArray) validators.push("IsArray");
-
-  if (isArray) {
-    if (baseType === "string") validators.push("IsString");
-    else if (baseType === "number") validators.push("IsNumber");
-    else if (baseType === "boolean") validators.push("IsBoolean");
-  } else {
-    if (type === "string" || type.includes("string")) validators.push("IsString");
-    else if (type === "number" || type.includes("number")) validators.push("IsNumber");
-    else if (type === "boolean" || type.includes("boolean")) validators.push("IsBoolean");
-    else if (type === "Date") validators.push("IsDate");
+@Injectable()
+export class ${pascalEntity}Repository extends Repository<${pascalEntity}> {
+  constructor(private dataSource: DataSource) {
+    super(${pascalEntity}, dataSource.createEntityManager());
   }
 
-  return validators;
+  async createEntity(dto: any): Promise<${pascalEntity}> {
+    const entity = this.create(dto);
+    return await this.save(entity);
+  }
+
+  async updateEntity(id: number, dto: any): Promise<${pascalEntity}> {
+    await this.update(id, dto);
+    return this.findOne({ where: { id } });
+  }
+
+  async findAllEntities(skip = 0, take = 10): Promise<PaginatedResponseDto<T>> {
+    const skip = (page - 1) * limit;
+    const [data, total] = await this.repo.findAndCount({ skip, take: limit });
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+}
+`;
 }
 
-function mapTypeToDto(type: string): { dtoType: string; swaggerType: string; example?: string } {
-  const isArray = type.endsWith("[]");
-  const baseType = isArray ? type.slice(0, -2) : type;
+function generateServiceContent(
+  pascalEntity: string,
+  camelEntity: string
+): string {
+  return `import { Injectable } from '@nestjs/common';
+import { ${pascalEntity}Repository } from '../repository/${camelEntity}.repository';
+import { ${pascalEntity} } from '../entities/${camelEntity}.entity';
 
-  const typeMappings: Record<string, { dtoType: string; swaggerType: string; example?: string }> = {
-    string: { dtoType: "string", swaggerType: "String", example: `'example'` },
-    number: { dtoType: "number", swaggerType: "Number", example: "1" },
-    boolean: { dtoType: "boolean", swaggerType: "Boolean", example: "true" },
-    Date: { dtoType: "string", swaggerType: "String", example: `'2023-01-01T00:00:00.000Z'` },
-    String: { dtoType: "string", swaggerType: "String", example: `'example'` },
-    Number: { dtoType: "number", swaggerType: "Number", example: "1" },
-    Boolean: { dtoType: "boolean", swaggerType: "Boolean", example: "true" },
-  };
+@Injectable()
+export class ${pascalEntity}Service {
+  constructor(private readonly repository: ${pascalEntity}Repository) {}
 
-  const mapping = typeMappings[baseType] || { dtoType: "any", swaggerType: "Object" };
+  async create(dto: any): Promise<${pascalEntity}> {
+    return this.repository.createEntity(dto);
+  }
 
-  return isArray
-    ? { dtoType: `${mapping.dtoType}[]`, swaggerType: mapping.swaggerType, example: mapping.example ? `[${mapping.example}]` : undefined }
-    : mapping;
+  async update(id: number, dto: any): Promise<${pascalEntity}> {
+    return this.repository.updateEntity(id, dto);
+  }
+
+  async findAll(page = 1, limit = 10): Promise<${pascalEntity}[]> {
+    const skip = (page - 1) * limit;
+    return this.repository.findAllEntities(skip, limit);
+  }
+
+  async findOne(id: number): Promise<${pascalEntity}> {
+    return this.repository.findOne({ where: { id } });
+  }
+}
+`;
+}
+
+async function writeFileSafely(
+  filePath: string,
+  content: string,
+  message: string
+) {
+  if (fs.existsSync(filePath)) {
+    const overwrite = await vscode.window.showWarningMessage(
+      `El archivo ${path.basename(filePath)} ya existe. ¿Sobrescribir?`,
+      "Sí",
+      "No"
+    );
+    if (overwrite !== "Sí") return;
+  }
+  fs.writeFileSync(filePath, content, "utf8");
+  vscode.window.showInformationMessage(
+    `${message}: ${path.basename(filePath)}`
+  );
+  const doc = await vscode.workspace.openTextDocument(filePath);
+  await vscode.window.showTextDocument(doc);
 }
 
 export function deactivate() {}
