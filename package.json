@@ -2,7 +2,7 @@
   "name": "nest-dto-generator",
   "displayName": "NestJS DTO Generator",
   "description": "Generate Swagger DTOs and NestJS CRUD services from TypeORM entities",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "tu-nombre",
   "engines": {
     "vscode": "^1.60.0"
@@ -12,6 +12,9 @@
   ],
   "activationEvents": [
     "onCommand:nest-dto-generator.generateDto",
+    "onCommand:nest-dto-generator.generateRepository",
+    "onCommand:nest-dto-generator.generateService",
+    "onCommand:nest-dto-generator.generateController",
     "onCommand:nest-dto-generator.generateCrud"
   ],
   "main": "./out/extension.js",
@@ -23,8 +26,23 @@
         "category": "NestJS"
       },
       {
+        "command": "nest-dto-generator.generateRepository",
+        "title": "Generate Repository",
+        "category": "NestJS"
+      },
+      {
+        "command": "nest-dto-generator.generateService",
+        "title": "Generate Service",
+        "category": "NestJS"
+      },
+      {
+        "command": "nest-dto-generator.generateController",
+        "title": "Generate Controller",
+        "category": "NestJS"
+      },
+      {
         "command": "nest-dto-generator.generateCrud",
-        "title": "Generate Repository & Service CRUD",
+        "title": "Generate Complete CRUD",
         "category": "NestJS"
       }
     ],
@@ -32,6 +50,21 @@
       "explorer/context": [
         {
           "command": "nest-dto-generator.generateDto",
+          "when": "resourceLangId == typescript",
+          "group": "navigation"
+        },
+        {
+          "command": "nest-dto-generator.generateRepository",
+          "when": "resourceLangId == typescript",
+          "group": "navigation"
+        },
+        {
+          "command": "nest-dto-generator.generateService",
+          "when": "resourceLangId == typescript",
+          "group": "navigation"
+        },
+        {
+          "command": "nest-dto-generator.generateController",
           "when": "resourceLangId == typescript",
           "group": "navigation"
         },

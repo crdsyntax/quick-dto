@@ -3,7 +3,7 @@ import * as path from "path";
 import * as fs from "fs";
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log("✅ NestJS DTO & CRUD Generator activado");
+  console.log("✅ NestJS DTO & CRUD Generator activated");
 
   const dtoDisposable = vscode.commands.registerCommand(
     "nest-dto-generator.generateDto",
@@ -12,21 +12,154 @@ export function activate(context: vscode.ExtensionContext) {
         const targetUri = uri || vscode.window.activeTextEditor?.document.uri;
         if (!targetUri) {
           vscode.window.showErrorMessage(
-            "No hay archivo seleccionado. Haz clic derecho sobre un archivo .entity.ts"
+            "No file selected. Right-click on a .entity.ts file"
           );
           return;
         }
 
         if (!targetUri.fsPath.endsWith(".entity.ts")) {
           vscode.window.showWarningMessage(
-            "Este comando solo funciona con archivos .entity.ts"
+            "This command only works with .entity.ts files"
           );
           return;
         }
 
         await generateDto(targetUri.fsPath);
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Error generando DTO: ${err.message}`);
+      } catch (err: unknown) {
+        vscode.window.showErrorMessage(
+          `Error generating DTO: ${(err as Error).message}`
+        );
+      }
+    }
+  );
+
+  const repositoryDisposable = vscode.commands.registerCommand(
+    "nest-dto-generator.generateRepository",
+    async (uri?: vscode.Uri) => {
+      try {
+        const targetUri = uri || vscode.window.activeTextEditor?.document.uri;
+        if (!targetUri) {
+          vscode.window.showErrorMessage(
+            "No file selected. Right-click on a .entity.ts file"
+          );
+          return;
+        }
+
+        if (!targetUri.fsPath.endsWith(".entity.ts")) {
+          vscode.window.showWarningMessage(
+            "This command only works with .entity.ts files"
+          );
+          return;
+        }
+
+        await generateRepository(targetUri.fsPath);
+      } catch (err: unknown) {
+        vscode.window.showErrorMessage(
+          `Error generating Repository: ${(err as Error).message}`
+        );
+      }
+    }
+  );
+
+  const serviceDisposable = vscode.commands.registerCommand(
+    "nest-dto-generator.generateService",
+    async (uri?: vscode.Uri) => {
+      try {
+        const targetUri = uri || vscode.window.activeTextEditor?.document.uri;
+        if (!targetUri) {
+          vscode.window.showErrorMessage(
+            "No file selected. Right-click on a .entity.ts file"
+          );
+          return;
+        }
+
+        if (!targetUri.fsPath.endsWith(".entity.ts")) {
+          vscode.window.showWarningMessage(
+            "This command only works with .entity.ts files"
+          );
+          return;
+        }
+
+        await generateService(targetUri.fsPath);
+      } catch (err: unknown) {
+        vscode.window.showErrorMessage(
+          `Error generating Service: ${(err as Error).message}`
+        );
+      }
+    }
+  );
+
+  const controllerDisposable = vscode.commands.registerCommand(
+    "nest-dto-generator.generateController",
+    async (uri?: vscode.Uri) => {
+      try {
+        const targetUri = uri || vscode.window.activeTextEditor?.document.uri;
+        if (!targetUri) {
+          vscode.window.showErrorMessage(
+            "No file selected. Right-click on a .entity.ts or .service.ts file"
+          );
+          return;
+        }
+
+        const fileName = path.basename(targetUri.fsPath);
+
+        let servicePath: string;
+        let pascalEntity: string;
+        let camelEntity: string;
+
+        if (fileName.endsWith(".entity.ts")) {
+          pascalEntity = toPascalCase(fileName.replace(".entity.ts", ""));
+          camelEntity = toCamelCase(pascalEntity);
+
+          const moduleFolder = path.dirname(path.dirname(targetUri.fsPath));
+          servicePath = path.join(
+            moduleFolder,
+            "services",
+            `${pascalEntity}.service.ts`
+          );
+        } else if (fileName.endsWith(".service.ts")) {
+          servicePath = targetUri.fsPath;
+          pascalEntity = toPascalCase(fileName.replace(".service.ts", ""));
+          camelEntity = toCamelCase(pascalEntity);
+        } else {
+          vscode.window.showWarningMessage(
+            "This command only works with .entity.ts or .service.ts files"
+          );
+          return;
+        }
+
+        if (!fs.existsSync(servicePath)) {
+          vscode.window.showErrorMessage(
+            `Service file not found: ${servicePath}`
+          );
+          return;
+        }
+
+        const serviceContent = fs.readFileSync(servicePath, "utf8");
+        const controllerFolder = path.join(
+          path.dirname(servicePath),
+          "../controllers"
+        );
+        fs.mkdirSync(controllerFolder, { recursive: true });
+
+        const controllerPath = path.join(
+          controllerFolder,
+          `${pascalEntity}.controller.ts`
+        );
+        const controllerContent = generateControllerContentFromService(
+          serviceContent,
+          camelEntity,
+          pascalEntity
+        );
+        await writeFileSafely(
+          controllerPath,
+          controllerContent,
+          "Controller generated"
+        );
+      } catch (err: unknown) {
+        vscode.window.showErrorMessage(
+          `Error generating Controller: ${(err as Error).message}`
+        );
       }
     }
   );
@@ -38,70 +171,160 @@ export function activate(context: vscode.ExtensionContext) {
         const targetUri = uri || vscode.window.activeTextEditor?.document.uri;
         if (!targetUri) {
           vscode.window.showErrorMessage(
-            "No hay archivo seleccionado. Haz clic derecho sobre un archivo .entity.ts"
+            "No file selected. Right-click on a .entity.ts file"
           );
           return;
         }
 
         if (!targetUri.fsPath.endsWith(".entity.ts")) {
           vscode.window.showWarningMessage(
-            "Este comando solo funciona con archivos .entity.ts"
+            "This command only works with .entity.ts files"
           );
           return;
         }
 
         await generateCrud(targetUri.fsPath);
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Error generando CRUD: ${err.message}`);
+      } catch (err: unknown) {
+        vscode.window.showErrorMessage(
+          `Error generating CRUD: ${(err as Error).message}`
+        );
       }
     }
   );
 
-  context.subscriptions.push(dtoDisposable, crudDisposable);
+  context.subscriptions.push(
+    dtoDisposable,
+    repositoryDisposable,
+    serviceDisposable,
+    controllerDisposable,
+    crudDisposable
+  );
 }
 
+// Individual command for DTO
 async function generateDto(entityPath: string) {
   const entityContent = fs.readFileSync(entityPath, "utf8");
   const entityName = path.basename(entityPath, ".entity.ts");
-  const dtoName = `${entityName.replace(/Entity$/, "")}Dto`;
-
-  const properties = parseEntityProperties(entityContent);
-  const dtoContent = generateDtoContent(dtoName, properties);
-
-  // Carpeta dto al mismo nivel que el módulo
-  const folder = path.dirname(entityPath);
-  const dtoFolder = path.join(folder, "..", "dto");
-  fs.mkdirSync(dtoFolder, { recursive: true });
-
-  const dtoPath = path.join(dtoFolder, `${dtoName}.ts`);
-  await writeFileSafely(dtoPath, dtoContent, "DTO generado");
-}
-
-async function generateCrud(entityPath: string) {
-  const entityContent = fs.readFileSync(entityPath, "utf8");
-  const entityName = path.basename(entityPath, ".entity.ts");
-  const pascalEntity = entityName.replace(/\.entity$/i, "");
+  const pascalEntity = toPascalCase(entityName.replace(/\.entity$/i, ""));
   const camelEntity = toCamelCase(pascalEntity);
 
-  // Carpeta base del módulo (fuera de entities)
-  const moduleFolder = path.dirname(path.dirname(entityPath));
-  const repoFolder = path.join(moduleFolder, "repositories");
-  const serviceFolder = path.join(moduleFolder, "services");
+  const properties = parseEntityProperties(entityContent);
 
-  fs.mkdirSync(repoFolder, { recursive: true });
-  fs.mkdirSync(serviceFolder, { recursive: true });
+  // Generate Create DTO
+  const createDtoContent = generateCreateDtoContent(pascalEntity, properties);
+  const createDtoPath = getDtoPath(entityPath, camelEntity, "create");
+  await writeFileSafely(
+    createDtoPath,
+    createDtoContent,
+    "Create DTO generated"
+  );
 
-  // Repository
-  const repoPath = path.join(repoFolder, `${pascalEntity}.repository.ts`);
-  const repoContent = generateRepositoryContent(camelEntity, pascalEntity);
-  await writeFileSafely(repoPath, repoContent, "Repository generado");
-
-  // Service
-  const servicePath = path.join(serviceFolder, `${pascalEntity}.service.ts`);
-  const serviceContent = generateServiceContent(camelEntity, pascalEntity);
-  await writeFileSafely(servicePath, serviceContent, "Service generado");
+  // Generate Update DTO
+  const updateDtoContent = generateUpdateDtoContent(pascalEntity, properties);
+  const updateDtoPath = getDtoPath(entityPath, camelEntity, "update");
+  await writeFileSafely(
+    updateDtoPath,
+    updateDtoContent,
+    "Update DTO generated"
+  );
 }
 
+// Individual command for Repository
+async function generateRepository(entityPath: string) {
+  const entityName = path.basename(entityPath, ".entity.ts");
+  const pascalEntity = toPascalCase(entityName.replace(/\.entity$/i, ""));
+  const camelEntity = toCamelCase(pascalEntity);
+
+  const moduleFolder = path.dirname(path.dirname(entityPath));
+  const repoFolder = path.join(moduleFolder, "repositories");
+  fs.mkdirSync(repoFolder, { recursive: true });
+
+  const repoPath = path.join(repoFolder, `${pascalEntity}.repository.ts`);
+  const repoContent = generateRepositoryContent(camelEntity, pascalEntity);
+  await writeFileSafely(repoPath, repoContent, "Repository generated");
+}
+
+// Individual command for Service
+async function generateService(entityPath: string) {
+  const entityName = path.basename(entityPath, ".entity.ts");
+  const pascalEntity = toPascalCase(entityName.replace(/\.entity$/i, ""));
+  const camelEntity = toCamelCase(pascalEntity);
+
+  const moduleFolder = path.dirname(path.dirname(entityPath));
+  const serviceFolder = path.join(moduleFolder, "services");
+  fs.mkdirSync(serviceFolder, { recursive: true });
+
+  const servicePath = path.join(serviceFolder, `${pascalEntity}.service.ts`);
+  const serviceContent = generateServiceContent(camelEntity, pascalEntity);
+  await writeFileSafely(servicePath, serviceContent, "Service generated");
+}
+
+// Individual command for Controller
+async function generateController(entityPath: string) {
+  const entityName = path.basename(entityPath, ".entity.ts");
+  const pascalEntity = toPascalCase(entityName.replace(/\.entity$/i, ""));
+  const camelEntity = toCamelCase(pascalEntity);
+
+  const moduleFolder = path.dirname(path.dirname(entityPath));
+  const serviceFolder = path.join(moduleFolder, "services");
+  const servicePath = path.join(serviceFolder, `${pascalEntity}.service.ts`);
+
+  if (!fs.existsSync(servicePath)) {
+    vscode.window.showErrorMessage(
+      `Service file not found: ${servicePath}. Generate the service first.`
+    );
+    return;
+  }
+
+  const serviceContent = fs.readFileSync(servicePath, "utf8");
+  const controllerFolder = path.join(moduleFolder, "controllers");
+  fs.mkdirSync(controllerFolder, { recursive: true });
+
+  const controllerPath = path.join(
+    controllerFolder,
+    `${pascalEntity}.controller.ts`
+  );
+  const controllerContent = generateControllerContentFromService(
+    serviceContent,
+    camelEntity,
+    pascalEntity
+  );
+  await writeFileSafely(
+    controllerPath,
+    controllerContent,
+    "Controller generated"
+  );
+}
+
+// Full CRUD command (generates everything)
+async function generateCrud(entityPath: string) {
+  await generateDto(entityPath);
+  await generateRepository(entityPath);
+  await generateService(entityPath);
+  await generateController(entityPath);
+  vscode.window.showInformationMessage("✅ Full CRUD generated successfully");
+}
+
+// Helper to get DTO path
+function getDtoPath(
+  entityPath: string,
+  camelEntity: string,
+  type: "create" | "update"
+): string {
+  const moduleFolder = path.dirname(path.dirname(entityPath));
+  const dtoFolder = path.join(moduleFolder, "dto", camelEntity);
+  fs.mkdirSync(dtoFolder, { recursive: true });
+  return path.join(dtoFolder, `${type}-${camelEntity}.dto.ts`);
+}
+
+// PascalCase - First letter of each word uppercase
+function toPascalCase(str: string): string {
+  return str
+    .replace(/[-_\s]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ""))
+    .replace(/^(.)/, (match) => match.toUpperCase());
+}
+
+// CamelCase - First letter lowercase, rest like PascalCase
 function toCamelCase(str: string): string {
   return str
     .replace(/[-_\s]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ""))
@@ -124,13 +347,13 @@ function parseEntityProperties(entityContent: string): PropertyInfo[] {
   for (const line of lines) {
     const trimmed = line.trim();
 
-    // Comentarios
+    // Comments
     if (trimmed.startsWith("//")) {
       currentComment += trimmed.substring(2).trim() + " ";
       continue;
     }
 
-    // Relaciones @ManyToOne/@OneToOne/@ManyToMany
+    // Relations @ManyToOne/@OneToOne/@ManyToMany
     const relationMatch = trimmed.match(
       /@(ManyToOne|OneToOne|ManyToMany)\(([^)]*)\)\s*(\w+)?\s*:/
     );
@@ -148,7 +371,7 @@ function parseEntityProperties(entityContent: string): PropertyInfo[] {
       continue;
     }
 
-    // Propiedades normales
+    // Normal properties
     const propMatch = trimmed.match(/^(\w+)\??:\s*([^;]+);/);
     if (propMatch) {
       let [, name, type] = propMatch;
@@ -172,20 +395,25 @@ function parseEntityProperties(entityContent: string): PropertyInfo[] {
   return properties;
 }
 
-function generateDtoContent(
-  dtoName: string,
+function generateCreateDtoContent(
+  pascalEntity: string,
   properties: PropertyInfo[]
 ): string {
-  let content = `import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';\n`;
-  content += `import { IsNotEmpty, IsOptional, IsString, IsNumber, IsBoolean, IsDate, IsArray, ArrayNotEmpty } from 'class-validator';\n\n`;
-  content += `export class ${dtoName} {\n`;
+  let content = `import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";\n`;
+  content += `import { IsNotEmpty, IsOptional, IsString, IsNumber, IsBoolean, IsDate, IsArray, ArrayNotEmpty } from "class-validator";\n\n`;
+  content += `export class Create${pascalEntity}Dto {\n`;
 
   for (const prop of properties) {
     const decorators: string[] = [];
 
-    if (prop.isOptional) decorators.push("@IsOptional()");
-    else decorators.push("@IsNotEmpty()");
+    // In Create DTO, optional properties keep @IsOptional()
+    if (prop.isOptional) {
+      decorators.push("@IsOptional()");
+    } else {
+      decorators.push("@IsNotEmpty()");
+    }
 
+    // Type validations
     if (prop.type === "string") decorators.push("@IsString()");
     else if (prop.type === "number") decorators.push("@IsNumber()");
     else if (prop.type === "boolean") decorators.push("@IsBoolean()");
@@ -200,7 +428,7 @@ function generateDtoContent(
       ? "ApiPropertyOptional"
       : "ApiProperty";
     const apiOptions = [`type: () => ${prop.type.replace("[]", "")}`];
-    if (prop.description) apiOptions.push(`description: '${prop.description}'`);
+    if (prop.description) apiOptions.push(`description: "${prop.description}"`);
     decorators.push(`@${apiDecorator}({ ${apiOptions.join(", ")} })`);
 
     content += "  " + decorators.join("\n  ") + `\n`;
@@ -211,13 +439,49 @@ function generateDtoContent(
   return content;
 }
 
-function generateRepositoryContent(
+function generateUpdateDtoContent(
   pascalEntity: string,
-  camelEntity: string
+  properties: PropertyInfo[]
 ): string {
-  return `import { Repository, DataSource } from 'typeorm';
-import { Injectable } from '@nestjs/common';
-import { ${pascalEntity} } from '../entities/${camelEntity}.entity';
+  let content = `import { ApiPropertyOptional } from "@nestjs/swagger";\n`;
+  content += `import { IsOptional, IsString, IsNumber, IsBoolean, IsDate, IsArray } from "class-validator";\n\n`;
+  content += `export class Update${pascalEntity}Dto {\n`;
+
+  for (const prop of properties) {
+    const decorators: string[] = [];
+
+    // In Update DTO, all properties are optional
+    decorators.push("@IsOptional()");
+
+    // Type validations (only if value is provided)
+    if (prop.type === "string") decorators.push("@IsString()");
+    else if (prop.type === "number") decorators.push("@IsNumber()");
+    else if (prop.type === "boolean") decorators.push("@IsBoolean()");
+    else if (prop.type === "Date") decorators.push("@IsDate()");
+
+    if (prop.type.endsWith("[]")) {
+      decorators.push("@IsArray()");
+    }
+
+    const apiOptions = [`type: () => ${prop.type.replace("[]", "")}`];
+    if (prop.description) apiOptions.push(`description: "${prop.description}"`);
+    decorators.push(`@ApiPropertyOptional({ ${apiOptions.join(", ")} })`);
+
+    content += "  " + decorators.join("\n  ") + `\n`;
+    content += `  ${prop.name}?: ${prop.type};\n\n`;
+  }
+
+  content += `}\n`;
+  return content;
+}
+
+function generateRepositoryContent(
+  camelEntity: string,
+  pascalEntity: string
+): string {
+  return `import { Repository, DataSource, UpdateResult, DeleteResult } from "typeorm";
+import { Injectable } from "@nestjs/common";
+import { ${pascalEntity} } from "../entities/${camelEntity}.entity";
 import { PaginatedResponseDto } from "@/common/dto/generic-response.dto";
 
 @Injectable()
@@ -226,19 +490,21 @@ export class ${pascalEntity}Repository extends Repository<${pascalEntity}> {
     super(${pascalEntity}, dataSource.createEntityManager());
   }
 
-  async createEntity(dto: any): Promise<${pascalEntity}> {
+  async createEntity(dto: Partial<${pascalEntity}>): Promise<${pascalEntity}> {
     const entity = this.create(dto);
     return await this.save(entity);
   }
 
-  async updateEntity(id: number, dto: any): Promise<${pascalEntity}> {
-    await this.update(id, dto);
-    return this.findOne({ where: { id } });
+  async updateEntity(id: number, dto: Partial<${pascalEntity}>): Promise<UpdateResult> {
+    return await this.update(id, dto);
   }
 
-  async findAllEntities(skip = 0, take = 10): Promise<PaginatedResponseDto<T>> {
+  async findAllEntities(page = 1, limit = 10): Promise<PaginatedResponseDto<${pascalEntity}>> {
     const skip = (page - 1) * limit;
-    const [data, total] = await this.repo.findAndCount({ skip, take: limit });
+    const [data, total] = await this.findAndCount({ 
+      skip, 
+      take: limit 
+    });
     return {
       data,
       total,
@@ -247,40 +513,413 @@ export class ${pascalEntity}Repository extends Repository<${pascalEntity}> {
       totalPages: Math.ceil(total / limit),
     };
   }
+
+  async findOneEntity(id: number): Promise<${pascalEntity} | null> {
+    return await this.findOne({ where: { id } });
+  }
+  
+  async removeEntity(id: number): Promise<DeleteResult> {
+    return await this.delete(id);
+  }
 }
 `;
 }
 
 function generateServiceContent(
-  pascalEntity: string,
-  camelEntity: string
+  camelEntity: string,
+  pascalEntity: string
 ): string {
-  return `import { Injectable } from '@nestjs/common';
-import { ${pascalEntity}Repository } from '../repository/${camelEntity}.repository';
-import { ${pascalEntity} } from '../entities/${camelEntity}.entity';
+  return `import { Injectable, NotFoundException } from "@nestjs/common";
+import { ${pascalEntity}Repository } from "../repositories/${camelEntity}.repository";
+import { ${pascalEntity} } from "../entities/${camelEntity}.entity";
+import { Create${pascalEntity}Dto } from "../dto/${camelEntity}/create-${camelEntity}.dto";
+import { Update${pascalEntity}Dto } from "../dto/${camelEntity}/update-${camelEntity}.dto";
+import { PaginatedResponseDto } from "@/common/dto/generic-response.dto";
+import { UpdateResult, DeleteResult } from "typeorm";
 
 @Injectable()
 export class ${pascalEntity}Service {
   constructor(private readonly repository: ${pascalEntity}Repository) {}
 
-  async create(dto: any): Promise<${pascalEntity}> {
-    return this.repository.createEntity(dto);
+  async create(createDto: Create${pascalEntity}Dto): Promise<${pascalEntity}> {
+    return await this.repository.createEntity(createDto);
   }
 
-  async update(id: number, dto: any): Promise<${pascalEntity}> {
-    return this.repository.updateEntity(id, dto);
-  }
-
-  async findAll(page = 1, limit = 10): Promise<${pascalEntity}[]> {
-    const skip = (page - 1) * limit;
-    return this.repository.findAllEntities(skip, limit);
+  async findAll(page = 1, limit = 10): Promise<PaginatedResponseDto<${pascalEntity}>> {
+    return await this.repository.findAllEntities(page, limit);
   }
 
   async findOne(id: number): Promise<${pascalEntity}> {
-    return this.repository.findOne({ where: { id } });
+    const entity = await this.repository.findOneEntity(id);
+    if (!entity) {
+      throw new NotFoundException(\`${pascalEntity} with ID \${id} not found\`);
+    }
+    return entity;
+  }
+
+  async update(id: number, updateDto: Update${pascalEntity}Dto): Promise<UpdateResult> {
+    await this.findOne(id); // Verify existence
+    return await this.repository.updateEntity(id, updateDto);
+  }
+
+  async remove(id: number): Promise<DeleteResult> {
+    await this.findOne(id); // Verify existence
+    return await this.repository.removeEntity(id);
   }
 }
 `;
+}
+
+interface ServiceMethodInfo {
+  name: string;
+  params: ServiceParamInfo[];
+  returnType: string;
+}
+
+interface ServiceParamInfo {
+  name: string;
+  type: string;
+  isOptional: boolean;
+  defaultValue?: string;
+}
+
+function parseServiceMethods(serviceContent: string): ServiceMethodInfo[] {
+  const lines = serviceContent.split("\n");
+  const methods: ServiceMethodInfo[] = [];
+  let currentMethod: Partial<ServiceMethodInfo> | null = null;
+  let braceCount = 0;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (
+      !trimmed ||
+      trimmed.startsWith("import") ||
+      trimmed.startsWith("export")
+    )
+      continue;
+
+    // Detect method start: [modifiers] name(params): returnType {
+    const methodMatch = trimmed.match(
+      /^(?:public|private|protected)?\s*(?:async\s+)?(\w+)\s*\(([^)]*)\)\s*:\s*([^{]+)\s*{/
+    );
+
+    if (methodMatch) {
+      const [, name, paramsStr, returnTypeStr] = methodMatch;
+
+      currentMethod = {
+        name: name.trim(),
+        params: [],
+        returnType: returnTypeStr.trim(),
+      };
+
+      // Parse params
+      if (paramsStr.trim()) {
+        const params = paramsStr
+          .split(",")
+          .map((p) => p.trim().match(/^(\w+)(\??):\s*(.+)$/));
+        if (params) {
+          currentMethod.params = params.filter(Boolean).map((pm) => {
+            const [, paramName, optional, paramType] = pm!;
+            return {
+              name: paramName,
+              type: paramType.trim(),
+              isOptional: optional === "?" || false,
+            };
+          });
+        }
+      }
+
+      braceCount = 1;
+      continue;
+    }
+
+    if (currentMethod && braceCount > 0) {
+      // Count braces to detect method end
+      braceCount +=
+        (trimmed.match(/{/g) || []).length - (trimmed.match(/}/g) || []).length;
+      if (braceCount <= 0) {
+        if (currentMethod.name) {
+          methods.push(currentMethod as ServiceMethodInfo);
+        }
+        currentMethod = null;
+        braceCount = 0;
+        continue;
+      }
+
+      // Parse params inside method declaration if needed, but since params are in the signature, parse from match
+      // Actually, better to parse params from the methodMatch
+    }
+  }
+
+  // Enhanced param parsing from full content or fallback to common patterns
+  // For simplicity, assume standard signatures and parse accordingly
+  // In practice, use a more robust parser, but here use regex on the whole content
+  const methodRegex = /async\s+(\w+)\s*\(([^)]*)\)\s*:\s*Promise<([^>]+)>\s*{/g;
+  let match;
+  while ((match = methodRegex.exec(serviceContent)) !== null) {
+    const name = match[1];
+    const paramsStr = match[2].trim();
+    const returnType = match[3].trim();
+
+    const params: ServiceParamInfo[] = [];
+    if (paramsStr) {
+      const paramMatches = paramsStr
+        .split(",")
+        .map((p) => p.trim().match(/^(\w+)(?:\s*=\s*(.*))?\s*:\s*(\w+)$/));
+      for (const paramMatch of paramMatches.filter(Boolean)) {
+        if (paramMatch) {
+          const [, paramName, defaultVal, paramType] = paramMatch;
+          params.push({
+            name: paramName,
+            type: paramType,
+            isOptional: !!defaultVal || paramName.endsWith("?"),
+            defaultValue: defaultVal || undefined,
+          });
+        }
+      }
+    }
+
+    methods.push({ name, params, returnType });
+  }
+
+  return methods.filter(
+    (m) =>
+      m.name &&
+      (m.name === "create" ||
+        m.name === "findAll" ||
+        m.name === "findOne" ||
+        m.name === "update" ||
+        m.name === "remove")
+  );
+}
+
+function generateControllerContentFromService(
+  serviceContent: string,
+  camelEntity: string,
+  pascalEntity: string
+): string {
+  const methods = parseServiceMethods(serviceContent);
+
+  // Collect imports dynamically
+  const commonImports = [
+    "Controller",
+    "Get",
+    "Post",
+    "Body",
+    "Param",
+    "Patch",
+    "Delete",
+    "ParseIntPipe",
+    "Query",
+  ];
+  const swaggerImports = [
+    "ApiTags",
+    "ApiOperation",
+    "ApiResponse",
+    "ApiQuery",
+    "ApiParam",
+  ];
+
+  const dtoImportsSet = new Set<string>();
+  const typeOrmImportsSet = new Set<string>();
+  let needsPaginated = false;
+  let needsEntity = false;
+
+  // Add DTO and TypeORM imports based on methods
+  for (const method of methods) {
+    if (method.name === "create") {
+      dtoImportsSet.add(
+        `import { Create${pascalEntity}Dto } from "../dto/${camelEntity}/create-${camelEntity}.dto";`
+      );
+      needsEntity = true;
+    } else if (method.name === "update") {
+      dtoImportsSet.add(
+        `import { Update${pascalEntity}Dto } from "../dto/${camelEntity}/update-${camelEntity}.dto";`
+      );
+      typeOrmImportsSet.add("UpdateResult");
+      needsEntity = true;
+    } else if (method.name === "remove") {
+      typeOrmImportsSet.add("DeleteResult");
+      needsEntity = true;
+    } else if (method.name === "findAll") {
+      needsPaginated = true;
+    } else if (method.name === "findOne") {
+      needsEntity = true;
+    }
+  }
+
+  let content = `import {\n  ${commonImports.join(
+    ",\n  "
+  )}\n} from "@nestjs/common";\n\n`;
+
+  content += `import {\n  ${swaggerImports.join(
+    ",\n  "
+  )}\n} from "@nestjs/swagger";\n\n`;
+
+  let serviceImport = `import { ${pascalEntity}Service } from "../services/${camelEntity}.service";\n`;
+  content += `${serviceImport}`;
+
+  if (needsEntity) {
+    let entityImport = `import { ${pascalEntity} } from "../entities/${camelEntity}.entity";\n`;
+    content += `${entityImport}`;
+  }
+
+  if (needsPaginated) {
+    let paginatedImport = `import { PaginatedResponseDto } from "@/common/dto/generic-response.dto";\n`;
+    content += `${paginatedImport}`;
+  }
+
+  if (dtoImportsSet.size > 0) {
+    content += `\n${Array.from(dtoImportsSet).join("\n")}\n`;
+  }
+
+  if (typeOrmImportsSet.size > 0) {
+    content += `import { ${Array.from(typeOrmImportsSet).join(
+      ", "
+    )} } from "typeorm";\n`;
+  }
+
+  content += `\n@ApiTags("${pascalEntity}")\n@Controller("${camelEntity}")\nexport class ${pascalEntity}Controller {\n`;
+  content += `  constructor(private readonly service: ${pascalEntity}Service) {}\n\n`;
+
+  for (const method of methods) {
+    let httpDecorator = "";
+    let operationSummary = "";
+    let apiResponses: string[] = [];
+    let apiParamDecorators: string[] = [];
+    let apiQueryDecorators: string[] = [];
+    let methodParams: string[] = [];
+    let callParams: string[] = [];
+
+    switch (method.name) {
+      case "create":
+        httpDecorator = "@Post()";
+        operationSummary = `Create a new ${pascalEntity}`;
+        apiResponses.push(
+          `@ApiResponse({ status: 201, description: "Entity created", type: ${pascalEntity} })`
+        );
+        const createDtoParam = method.params.find((p) =>
+          p.type.includes("Create")
+        ) || { name: "createDto", type: `Create${pascalEntity}Dto` };
+        methodParams.push(
+          `@Body() ${createDtoParam.name}: ${createDtoParam.type}`
+        );
+        callParams.push(createDtoParam.name);
+        break;
+      case "findAll":
+        httpDecorator = "@Get()";
+        operationSummary = `List all ${pascalEntity} entities`;
+        apiResponses.push(
+          `@ApiResponse({ status: 200, description: "List of entities", type: PaginatedResponseDto<${pascalEntity}> })`
+        );
+        apiQueryDecorators.push(
+          `@ApiQuery({ name: "page", type: Number, description: "Pagination page", required: false, default: 1 })`
+        );
+        apiQueryDecorators.push(
+          `@ApiQuery({ name: "limit", type: Number, description: "Pagination limit", required: false, default: 10 })`
+        );
+        const pageParam = method.params.find((p) => p.name === "page") || {
+          name: "page",
+          type: "number",
+          defaultValue: "1",
+        };
+        const limitParam = method.params.find((p) => p.name === "limit") || {
+          name: "limit",
+          type: "number",
+          defaultValue: "10",
+        };
+        methodParams.push(
+          `@Query("page", ParseIntPipe) ${pageParam.name} = ${
+            pageParam.defaultValue || 1
+          }`
+        );
+        methodParams.push(
+          `@Query("limit", ParseIntPipe) ${limitParam.name} = ${
+            limitParam.defaultValue || 10
+          }`
+        );
+        callParams.push(pageParam.name, limitParam.name);
+        break;
+      case "findOne":
+        httpDecorator = "@Get(':id')";
+        operationSummary = `Get ${pascalEntity} by id`;
+        apiResponses.push(
+          `@ApiResponse({ status: 200, description: "Entity found", type: ${pascalEntity} })`
+        );
+        apiParamDecorators.push(
+          `@ApiParam({ name: "id", description: "Entity ID", type: Number })`
+        );
+        const idParam = method.params.find((p) => p.name === "id") || {
+          name: "id",
+          type: "number",
+        };
+        methodParams.push(`@Param("id", ParseIntPipe) ${idParam.name}: number`);
+        callParams.push(idParam.name);
+        break;
+      case "update":
+        httpDecorator = "@Patch(':id')";
+        operationSummary = `Update ${pascalEntity} by id`;
+        apiResponses.push(
+          `@ApiResponse({ status: 200, description: "Entity updated" })`
+        );
+        const updateIdParam = method.params.find((p) => p.name === "id") || {
+          name: "id",
+          type: "number",
+        };
+        apiParamDecorators.push(
+          `@ApiParam({ name: "id", description: "Entity ID", type: Number })`
+        );
+        const updateDtoParam = method.params.find((p) =>
+          p.type.includes("Update")
+        ) || { name: "updateDto", type: `Update${pascalEntity}Dto` };
+        methodParams.push(
+          `@Param("id", ParseIntPipe) ${updateIdParam.name}: number`
+        );
+        methodParams.push(
+          `@Body() ${updateDtoParam.name}: ${updateDtoParam.type}`
+        );
+        callParams.push(updateIdParam.name, updateDtoParam.name);
+        break;
+      case "remove":
+        httpDecorator = "@Delete(':id')";
+        operationSummary = `Delete ${pascalEntity} by id`;
+        apiResponses.push(
+          `@ApiResponse({ status: 200, description: "Entity deleted" })`
+        );
+        const removeIdParam = method.params.find((p) => p.name === "id") || {
+          name: "id",
+          type: "number",
+        };
+        apiParamDecorators.push(
+          `@ApiParam({ name: "id", description: "Entity ID", type: Number })`
+        );
+        methodParams.push(
+          `@Param("id", ParseIntPipe) ${removeIdParam.name}: number`
+        );
+        callParams.push(removeIdParam.name);
+        break;
+    }
+
+    content += `  ${httpDecorator}\n`;
+    if (apiQueryDecorators.length > 0) {
+      apiQueryDecorators.forEach((dec) => (content += `  ${dec}\n`));
+    }
+    if (apiParamDecorators.length > 0) {
+      apiParamDecorators.forEach((dec) => (content += `  ${dec}\n`));
+    }
+    content += `  @ApiOperation({ summary: "${operationSummary}" })\n`;
+    apiResponses.forEach((resp) => (content += `  ${resp}\n`));
+    content += `  ${method.name}(${methodParams.join(", ")}): Promise<${
+      method.returnType
+    }> {\n`;
+    content += `    return this.service.${method.name}(${callParams.join(
+      ", "
+    )});\n`;
+    content += `  }\n\n`;
+  }
+
+  content += `}\n`;
+  return content;
 }
 
 async function writeFileSafely(
@@ -290,11 +929,11 @@ async function writeFileSafely(
 ) {
   if (fs.existsSync(filePath)) {
     const overwrite = await vscode.window.showWarningMessage(
-      `El archivo ${path.basename(filePath)} ya existe. ¿Sobrescribir?`,
-      "Sí",
+      `The file ${path.basename(filePath)} already exists. Overwrite?`,
+      "Yes",
       "No"
     );
-    if (overwrite !== "Sí") return;
+    if (overwrite !== "Yes") return;
   }
   fs.writeFileSync(filePath, content, "utf8");
   vscode.window.showInformationMessage(
