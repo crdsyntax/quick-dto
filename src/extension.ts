@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
+import { commonImports, PropertyInfo, ServiceMethodInfo, ServiceParamInfo, swaggerImports } from "./types";
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("✅ NestJS DTO & CRUD Generator activated");
@@ -331,13 +332,7 @@ function toCamelCase(str: string): string {
     .replace(/^[A-Z]/, (match) => match.toLowerCase());
 }
 
-interface PropertyInfo {
-  name: string;
-  type: string;
-  isOptional: boolean;
-  isRelationId?: boolean;
-  description?: string;
-}
+
 
 function parseEntityProperties(entityContent: string): PropertyInfo[] {
   const lines = entityContent.split("\n");
@@ -570,18 +565,7 @@ export class ${pascalEntity}Service {
 `;
 }
 
-interface ServiceMethodInfo {
-  name: string;
-  params: ServiceParamInfo[];
-  returnType: string;
-}
 
-interface ServiceParamInfo {
-  name: string;
-  type: string;
-  isOptional: boolean;
-  defaultValue?: string;
-}
 
 function parseServiceMethods(serviceContent: string): ServiceMethodInfo[] {
   const lines = serviceContent.split("\n");
@@ -634,7 +618,6 @@ function parseServiceMethods(serviceContent: string): ServiceMethodInfo[] {
     }
 
     if (currentMethod && braceCount > 0) {
-      // Count braces to detect method end
       braceCount +=
         (trimmed.match(/{/g) || []).length - (trimmed.match(/}/g) || []).length;
       if (braceCount <= 0) {
@@ -646,14 +629,9 @@ function parseServiceMethods(serviceContent: string): ServiceMethodInfo[] {
         continue;
       }
 
-      // Parse params inside method declaration if needed, but since params are in the signature, parse from match
-      // Actually, better to parse params from the methodMatch
     }
   }
 
-  // Enhanced param parsing from full content or fallback to common patterns
-  // For simplicity, assume standard signatures and parse accordingly
-  // In practice, use a more robust parser, but here use regex on the whole content
   const methodRegex = /async\s+(\w+)\s*\(([^)]*)\)\s*:\s*Promise<([^>]+)>\s*{/g;
   let match;
   while ((match = methodRegex.exec(serviceContent)) !== null) {
@@ -699,26 +677,6 @@ function generateControllerContentFromService(
   pascalEntity: string
 ): string {
   const methods = parseServiceMethods(serviceContent);
-
-  // Collect imports dynamically
-  const commonImports = [
-    "Controller",
-    "Get",
-    "Post",
-    "Body",
-    "Param",
-    "Patch",
-    "Delete",
-    "ParseIntPipe",
-    "Query",
-  ];
-  const swaggerImports = [
-    "ApiTags",
-    "ApiOperation",
-    "ApiResponse",
-    "ApiQuery",
-    "ApiParam",
-  ];
 
   const dtoImportsSet = new Set<string>();
   const typeOrmImportsSet = new Set<string>();
@@ -909,9 +867,9 @@ function generateControllerContentFromService(
     }
     content += `  @ApiOperation({ summary: "${operationSummary}" })\n`;
     apiResponses.forEach((resp) => (content += `  ${resp}\n`));
-    content += `  ${method.name}(${methodParams.join(", ")}): Promise<${
+    content += `  ${method.name}(${methodParams.join(", ")}): ${
       method.returnType
-    }> {\n`;
+    } {\n`;
     content += `    return this.service.${method.name}(${callParams.join(
       ", "
     )});\n`;
