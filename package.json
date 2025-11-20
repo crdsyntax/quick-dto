@@ -1,48 +1,71 @@
 {
-  "name": "nest-dto-generator",
-  "displayName": "NestJS DTO Generator",
-  "description": "Generate Swagger DTOs and NestJS CRUD services from TypeORM entities",
-  "version": "1.2.0",
-  "publisher": "tu-nombre",
+  "name": "nest-helper-files",
+  "displayName": "NestJS DTO & CRUD Generator + Autocomplete",
+  "description": "Genera DTOs con Swagger, Repository, Service, Controller y CRUD completo desde entidades TypeORM. Incluye autocompletado inteligente de funciones en controladores.",
+  "version": "1.7.0",
+  "publisher": "crdsyntax",
+  "icon": "",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/crdsyntax/quick-dto"
+  },
   "engines": {
-    "vscode": "^1.60.0"
+    "vscode": "^1.80.0"
   },
   "categories": [
+    "Programming Languages",
+    "Snippets",
     "Other"
   ],
-  "activationEvents": [
-    "onCommand:nest-dto-generator.generateDto",
-    "onCommand:nest-dto-generator.generateRepository",
-    "onCommand:nest-dto-generator.generateService",
-    "onCommand:nest-dto-generator.generateController",
-    "onCommand:nest-dto-generator.generateCrud"
+  "keywords": [
+    "nestjs",
+    "typeorm",
+    "dto",
+    "swagger",
+    "crud",
+    "generator",
+    "autocomplete",
+    "productivity"
   ],
   "main": "./out/extension.js",
+  "activationEvents": [
+  "*"
+  ],
   "contributes": {
     "commands": [
       {
         "command": "nest-dto-generator.generateDto",
-        "title": "Generate Swagger DTO",
-        "category": "NestJS"
+        "title": "Generate DTOs (Create + Update)",
+        "category": "NestJS CRUD"
       },
       {
         "command": "nest-dto-generator.generateRepository",
         "title": "Generate Repository",
-        "category": "NestJS"
+        "category": "NestJS CRUD"
       },
       {
         "command": "nest-dto-generator.generateService",
         "title": "Generate Service",
-        "category": "NestJS"
+        "category": "NestJS CRUD"
       },
       {
         "command": "nest-dto-generator.generateController",
-        "title": "Generate Controller",
-        "category": "NestJS"
+        "title": "Generate Controller from Service",
+        "category": "NestJS CRUD"
       },
       {
         "command": "nest-dto-generator.generateCrud",
-        "title": "Generate Complete CRUD",
+        "title": "Generate Full CRUD (DTO + Repo + Service + Controller)",
+        "category": "NestJS CRUD"
+      },
+      {
+        "command": "nest-tools.completeReturnType",
+        "title": "Complete Return Type (Smart Promise<T>)",
+        "category": "NestJS"
+      },
+      {
+        "command": "nest-tools.triggerReturnType",
+        "title": "Trigger Complete Return Type",
         "category": "NestJS"
       }
     ],
@@ -50,40 +73,58 @@
       "explorer/context": [
         {
           "command": "nest-dto-generator.generateDto",
-          "when": "resourceLangId == typescript",
-          "group": "navigation"
-        },
-        {
-          "command": "nest-dto-generator.generateRepository",
-          "when": "resourceLangId == typescript",
-          "group": "navigation"
-        },
-        {
-          "command": "nest-dto-generator.generateService",
-          "when": "resourceLangId == typescript",
-          "group": "navigation"
-        },
-        {
-          "command": "nest-dto-generator.generateController",
-          "when": "resourceLangId == typescript",
-          "group": "navigation"
+          "when": "resourceFilename =~ /\\.entity\\.ts$/",
+          "group": "nestjs@1"
         },
         {
           "command": "nest-dto-generator.generateCrud",
-          "when": "resourceLangId == typescript",
+          "when": "resourceFilename =~ /\\.entity\\.ts$/",
+          "group": "nestjs@2"
+        },
+        {
+          "command": "nest-dto-generator.generateRepository",
+          "when": "resourceFilename =~ /\\.entity\\.ts$/",
+          "group": "nestjs@3"
+        },
+        {
+          "command": "nest-dto-generator.generateService",
+          "when": "resourceFilename =~ /\\.entity\\.ts$/",
+          "group": "nestjs@4"
+        },
+        {
+          "command": "nest-dto-generator.generateController",
+          "when": "resourceFilename =~ /\\.(entity|service)\\.ts$/",
+          "group": "nestjs@5"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "nest-tools.completeReturnType",
+          "when": "editorTextFocus && editorLangId == typescript",
           "group": "navigation"
         }
       ]
-    }
+    },
+    "keybindings": [
+      {
+        "command": "nest-tools.completeReturnType",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t",
+        "when": "editorTextFocus"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "publish": "vsce publish"
   },
   "devDependencies": {
-    "@types/vscode": "^1.60.0",
-    "@types/node": "16.x",
-    "typescript": "^4.9.4"
+    "@types/vscode": "^1.80.0",
+    "@types/node": "^18.x",
+    "typescript": "^5.3.0",
+    "vsce": "^2.15.0"
   }
 }

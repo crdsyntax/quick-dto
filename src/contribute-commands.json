@@ -1,0 +1,78 @@
+{
+  "commands": [
+    {
+      "command": "nest-dto-generator.generateDto",
+      "title": "Generate DTOs (Create + Update)",
+      "category": "NestJS CRUD"
+    },
+    {
+      "command": "nest-dto-generator.generateRepository",
+      "title": "Generate Repository",
+      "category": "NestJS CRUD"
+    },
+    {
+      "command": "nest-dto-generator.generateService",
+      "title": "Generate Service",
+      "category": "NestJS CRUD"
+    },
+    {
+      "command": "nest-dto-generator.generateController",
+      "title": "Generate Controller from Service",
+      "category": "NestJS CRUD"
+    },
+    {
+      "command": "nest-dto-generator.generateCrud",
+      "title": "Generate Full CRUD (DTO + Repo + Service + Controller)",
+      "category": "NestJS CRUD"
+    },
+    {
+      "command": "nest-tools.completeReturnType",
+      "title": "Complete Return Type (Smart Promise<T>)",
+      "category": "NestJS"
+    }
+  ],
+  "menus": {
+    "explorer/context": [
+      {
+        "command": "nest-dto-generator.generateDto",
+        "when": "resourceFilename =~ /\\.entity\\.ts$/",
+        "group": "nestjs@1"
+      },
+      {
+        "command": "nest-dto-generator.generateCrud",
+        "when": "resourceFilename =~ /\\.entity\\.ts$/",
+        "group": "nestjs@2"
+      },
+      {
+        "command": "nest-dto-generator.generateRepository",
+        "when": "resourceFilename =~ /\\.entity\\.ts$/",
+        "group": "nestjs@3"
+      },
+      {
+        "command": "nest-dto-generator.generateService",
+        "when": "resourceFilename =~ /\\.entity\\.ts$/",
+        "group": "nestjs@4"
+      },
+      {
+        "command": "nest-dto-generator.generateController",
+        "when": "resourceFilename =~ /\\.(entity|service)\\.ts$/",
+        "group": "nestjs@5"
+      }
+    ],
+    "editor/context": [
+      {
+        "command": "nest-tools.completeReturnType",
+        "when": "editorTextFocus && editorLangId == typescript",
+        "group": "navigation"
+      }
+    ]
+  },
+  "keybindings": [
+    {
+      "command": "nest-tools.completeReturnType",
+      "key": "ctrl+shift+t",
+      "mac": "cmd+shift+t",
+      "when": "editorTextFocus"
+    }
+  ]
+}
