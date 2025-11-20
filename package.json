@@ -1,10 +1,10 @@
 {
   "name": "nest-helper-files",
-  "displayName": "NestJS DTO & CRUD Generator + Autocomplete",
+  "displayName": "NestJS tools Generator",
   "description": "Genera DTOs con Swagger, Repository, Service, Controller y CRUD completo desde entidades TypeORM. Incluye autocompletado inteligente de funciones en controladores.",
-  "version": "1.7.0",
+  "version": "2.0.0",
   "publisher": "crdsyntax",
-  "icon": "",
+  "icon": "src/image/logo.jpg",
   "repository": {
     "type": "git",
     "url": "https://github.com/crdsyntax/quick-dto"
@@ -29,7 +29,7 @@
   ],
   "main": "./out/extension.js",
   "activationEvents": [
-  "*"
+    "*"
   ],
   "contributes": {
     "commands": [
@@ -67,6 +67,11 @@
         "command": "nest-tools.triggerReturnType",
         "title": "Trigger Complete Return Type",
         "category": "NestJS"
+      },
+      {
+        "command": "nest-tools.controllerByFunction",
+        "title": "Generate Controller Endpoint",
+        "category": "NestJS"
       }
     ],
     "menus": {
@@ -102,6 +107,11 @@
           "command": "nest-tools.completeReturnType",
           "when": "editorTextFocus && editorLangId == typescript",
           "group": "navigation"
+        },
+        {
+          "command": "nest-tools.controllerByFunction",
+          "when": "editorHasSelection && editorLangId == typescript",
+          "group": "nestjs@5"
         }
       ]
     },
@@ -109,6 +119,12 @@
       {
         "command": "nest-tools.completeReturnType",
         "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "nest-tools.controllerByFunction",
+        "key": "ctrl+shift+y",
         "mac": "cmd+shift+t",
         "when": "editorTextFocus"
       }
@@ -122,9 +138,12 @@
     "publish": "vsce publish"
   },
   "devDependencies": {
-    "@types/vscode": "^1.80.0",
     "@types/node": "^18.x",
+    "@types/vscode": "^1.80.0",
     "typescript": "^5.3.0",
     "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "tslib": "^2.8.1"
   }
 }

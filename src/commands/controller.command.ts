@@ -24,7 +24,7 @@ export async function generateControllerCommand(uri?: vscode.Uri) {
       pascalEntity = toPascalCase(fileName.replace(".entity.ts", ""));
       camelEntity = toCamelCase(pascalEntity);
       const moduleFolder = path.dirname(path.dirname(targetUri.fsPath));
-      servicePath = path.join(moduleFolder, "services", `${pascalEntity}.service.ts`);
+      servicePath = path.join(moduleFolder, "services", `${camelEntity}.service.ts`);
     } else if (fileName.endsWith(".service.ts")) {
       servicePath = targetUri.fsPath;
       pascalEntity = toPascalCase(fileName.replace(".service.ts", ""));
@@ -43,7 +43,7 @@ export async function generateControllerCommand(uri?: vscode.Uri) {
     const controllerFolder = path.join(path.dirname(servicePath), "../controllers");
     fs.mkdirSync(controllerFolder, { recursive: true });
 
-    const controllerPath = path.join(controllerFolder, `${pascalEntity}.controller.ts`);
+  const controllerPath = path.join(controllerFolder, `${camelEntity}.controller.ts`);
     const content = generateControllerContentFromService(serviceContent, camelEntity, pascalEntity);
 
     await writeFileSafely(controllerPath, content, "Controller generated");

@@ -15,7 +15,7 @@ export class ${pascalEntity}Repository extends Repository<${pascalEntity}> {
     return await this.save(entity);
   }
 
-  async updateEntity(id: number, dto: Partial<${pascalEntity}> trasform: UpdateResult {
+  async updateEntity(id: number, dto: Partial<${pascalEntity}>): Promise<UpdateResult> {
     return await this.update(id, dto);
   }
 

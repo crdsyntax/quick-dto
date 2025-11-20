@@ -23,7 +23,7 @@ export async function generateServiceCommand(uri?: vscode.Uri) {
     const serviceFolder = path.join(moduleFolder, "services");
     fs.mkdirSync(serviceFolder, { recursive: true });
 
-    const servicePath = path.join(serviceFolder, `${pascalEntity}.service.ts`);
+  const servicePath = path.join(serviceFolder, `${camelEntity}.service.ts`);
     const content = generateServiceContent(camelEntity, pascalEntity);
 
     await writeFileSafely(servicePath, content, "Service generated");

@@ -23,7 +23,7 @@ export async function generateRepositoryCommand(uri?: vscode.Uri) {
     const repoFolder = path.join(moduleFolder, "repositories");
     fs.mkdirSync(repoFolder, { recursive: true });
 
-    const repoPath = path.join(repoFolder, `${pascalEntity}.repository.ts`);
+  const repoPath = path.join(repoFolder, `${camelEntity}.repository.ts`);
     const content = generateRepositoryContent(camelEntity, pascalEntity);
 
     await writeFileSafely(repoPath, content, "Repository generated");

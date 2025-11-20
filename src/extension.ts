@@ -5,9 +5,10 @@ import { generateServiceCommand } from "./commands/service.command";
 import { generateControllerCommand } from "./commands/controller.command";
 import { generateCrudCommand } from "./commands/crud.command";
 import { completeReturnType } from "./autocomplete/functionReturn";
+import { generateControllerEndpoint } from "./commands/controller-by-function.command";
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log("NestJS Tools: Generador CRUD + Autocomplete activado");
+  console.log("NestJS Tools Generador actived");
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -37,16 +38,20 @@ export function activate(context: vscode.ExtensionContext) {
     completeReturnType
   );
 
+  const disposablece = vscode.commands.registerCommand(
+    "nest-tools.controllerByFunction",
+    generateControllerEndpoint
+  );
+
   context.subscriptions.push(disposable);
+  context.subscriptions.push(disposablece);
 
   context.subscriptions.push(
     vscode.commands.registerCommand("nest-tools.triggerReturnType", () => {
       vscode.commands.executeCommand("nest-tools.completeReturnType");
     })
   );
-  vscode.window.showInformationMessage(
-    "NestJS Tools listo: Generador CRUD + Autocomplete activado"
-  );
+  vscode.window.showInformationMessage("NestJS Tools Autocomplete");
 }
 
 export function deactivate() {
