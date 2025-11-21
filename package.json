@@ -2,7 +2,7 @@
   "name": "nest-helper-files",
   "displayName": "NestJS tools Generator",
   "description": "Genera DTOs con Swagger, Repository, Service, Controller y CRUD completo desde entidades TypeORM. Incluye autocompletado inteligente de funciones en controladores.",
-  "version": "2.0.0",
+  "version": "2.5.0",
   "publisher": "crdsyntax",
   "icon": "src/image/logo.jpg",
   "repository": {
@@ -36,6 +36,16 @@
       {
         "command": "nest-dto-generator.generateDto",
         "title": "Generate DTOs (Create + Update)",
+        "category": "NestJS CRUD"
+      },
+      {
+        "command": "nest-dto-generator.generateInterface",
+        "title": "Generate Interface",
+        "category": "NestJS CRUD"
+      },
+      {
+        "command": "nest-dto-generator.generateReturnInterface",
+        "title": "Generate Interface from Return",
         "category": "NestJS CRUD"
       },
       {
@@ -91,23 +101,28 @@
       {
         "command": "nest-tools.convertOrm",
         "title": "NestJS: Convert ORM (TypeORM ↔ Mongoose)",
-        "category": "NestJS Tools"
+        "category": "NestJS"
       },
       {
         "command": "nest-tools.migrateToTypeOrm",
         "title": "NestJS: Migrate Mongoose to TypeORM",
-        "category": "NestJS Tools"
+        "category": "NestJS"
       },
       {
         "command": "nest-tools.exploreDataDictionary",
         "title": "NestJS: Explore Data Dictionary",
-        "category": "NestJS Tools"
+        "category": "NestJS"
       }
     ],
     "menus": {
       "explorer/context": [
         {
           "command": "nest-dto-generator.generateDto",
+          "when": "resourceFilename =~ /\\.entity\\.ts$/",
+          "group": "nestjs@1"
+        },
+        {
+          "command": "nest-dto-generator.generateInterface",
           "when": "resourceFilename =~ /\\.entity\\.ts$/",
           "group": "nestjs@1"
         },
@@ -138,29 +153,30 @@
         },
         {
           "command": "nest-tools.generateEntity",
-          "group": "navigation",
-          "when": "explorerResourceIsFolder"
+          "when": "explorerResourceIsFolder",
+          "group": "nestjs@6"
         },
         {
           "command": "nest-tools.convertOrm",
-          "group": "nestjs",
-          "when": "resourceExtname == .ts"
-        },
-        {
-          "command": "nest-tools.exploreDataDictionary",
-          "group": "nestjs"
+          "when": "resourceExtname == .ts",
+          "group": "nestjs@7"
         }
       ],
       "editor/context": [
         {
           "command": "nest-tools.completeReturnType",
           "when": "editorTextFocus && editorLangId == typescript",
-          "group": "navigation"
+          "group": "nestjs@1"
         },
         {
           "command": "nest-tools.controllerByFunction",
           "when": "editorHasSelection && editorLangId == typescript",
-          "group": "nestjs@5"
+          "group": "nestjs@2"
+        },
+        {
+          "command": "nest-dto-generator.generateReturnInterface",
+          "when": "editorTextFocus && editorLangId == typescript",
+          "group": "nestjs@3"
         }
       ],
       "command-palette": [
@@ -172,9 +188,6 @@
         },
         {
           "command": "nest-tools.migrateToTypeOrm"
-        },
-        {
-          "command": "nest-tools.exploreDataDictionary"
         }
       ]
     },
@@ -203,10 +216,10 @@
   "devDependencies": {
     "@types/node": "^18.x",
     "@types/vscode": "^1.80.0",
-    "typescript": "^5.3.0",
     "vsce": "^2.15.0"
   },
   "dependencies": {
-    "tslib": "^2.8.1"
+    "tslib": "^2.8.1",
+    "typescript": "^5.3.0"
   }
 }

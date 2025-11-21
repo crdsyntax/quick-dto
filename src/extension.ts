@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 import { generateDtoCommand } from "./commands/dto.command";
+import { generateInterfaceCommand } from "./commands/interface.command";
+import { generateReturnInterfaceCommand } from "./commands/return-interface.command";
 import { generateRepositoryCommand } from "./commands/repository.command";
 import { generateServiceCommand } from "./commands/service.command";
 import { generateControllerCommand } from "./commands/controller.command";
@@ -20,6 +22,14 @@ export function activate(context: vscode.ExtensionContext) {
       generateDtoCommand
     ),
     vscode.commands.registerCommand(
+      "nest-dto-generator.generateInterface",
+      generateInterfaceCommand
+    ),
+    vscode.commands.registerCommand(
+      "nest-dto-generator.generateReturnInterface",
+      generateReturnInterfaceCommand
+    ),
+    vscode.commands.registerCommand(
       "nest-dto-generator.generateRepository",
       generateRepositoryCommand
     ),
@@ -34,69 +44,31 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "nest-dto-generator.generateCrud",
       generateCrudCommand
+    ),
+    vscode.commands.registerCommand(
+      "nest-tools.completeReturnType",
+      completeReturnType
+    ),
+    vscode.commands.registerCommand(
+      "nest-tools.controllerByFunction",
+      generateControllerEndpoint
+    ),
+    vscode.commands.registerCommand(
+      "nest-tools.generateDiagram",
+      registerDiagramCommand
+    ),
+    vscode.commands.registerCommand(
+      "nest-tools.generateEntity", EntityGenerator.generateEntity
+    ),
+    vscode.commands.registerCommand(
+      "nest-tools.generateEntityFromPalette", EntityGenerator.generateEntity
+    ),
+    vscode.commands.registerCommand(
+      "nest-tools.convertOrm", OrmConverter.convertOrm
+    ),
+    vscode.commands.registerCommand(
+      "nest-tools.migrateToTypeOrm", MongooseToTypeOrmMigrator.migrateToTypeOrm
     )
-  );
-
-  const disposable = vscode.commands.registerCommand(
-    "nest-tools.completeReturnType",
-    completeReturnType
-  );
-
-  const disposablece = vscode.commands.registerCommand(
-    "nest-tools.controllerByFunction",
-    generateControllerEndpoint
-  );
-
-  const disposabledia = vscode.commands.registerCommand(
-    "nest-tools.generateDiagram",
-    registerDiagramCommand
-  );
-
-  let generateEntityCommand = vscode.commands.registerCommand(
-    "nest-tools.generateEntity",
-    (uri: vscode.Uri) => {
-      EntityGenerator.generateEntity();
-    }
-  );
-
-  let generateEntityFromPalette = vscode.commands.registerCommand(
-    "nest-tools.generateEntityFromPalette",
-    () => {
-      EntityGenerator.generateEntity();
-    }
-  );
-
-  let exploreDataDictionary = vscode.commands.registerCommand(
-    "nest-tools.exploreDataDictionary",
-    () => {
-      EntityGenerator.showDataDictionary();
-    }
-  );
-
-  let convertOrmCommand = vscode.commands.registerCommand(
-    "nest-tools.convertOrm",
-    () => {
-      OrmConverter.convertOrm();
-    }
-  );
-
-  let migrateToTypeOrmCommand = vscode.commands.registerCommand(
-    "nest-tools.migrateToTypeOrm",
-    () => {
-      MongooseToTypeOrmMigrator.migrateToTypeOrm();
-    }
-  );
-
-  context.subscriptions.push(
-    generateEntityCommand,
-    generateEntityFromPalette,
-    exploreDataDictionary,
-    disposable,
-    disposabledia,
-    disposablece,
-    
-    convertOrmCommand,
-    migrateToTypeOrmCommand
   );
 
   context.subscriptions.push(
