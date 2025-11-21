@@ -1,10 +1,10 @@
-// src/commands/generateController.ts
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 import { toCamelCase, toPascalCase } from "../utils/case.util";
 import { writeFileSafely } from "../utils/file.utils";
 import { generateControllerContentFromService } from "../generators/controller.generator";
+import { ensureModuleRegisters } from "../utils/module.util";
 
 
 export async function generateControllerCommand(uri?: vscode.Uri) {
@@ -47,6 +47,14 @@ export async function generateControllerCommand(uri?: vscode.Uri) {
     const content = generateControllerContentFromService(serviceContent, camelEntity, pascalEntity);
 
     await writeFileSafely(controllerPath, content, "Controller generated");
+    try {
+      const moduleFolder = path.dirname(path.dirname(controllerPath));
+      const kebabEntity = pascalEntity.replace(/([a-z])([A-Z])/g, '$1-$2').replace(/[_ ]/g, '-').toLowerCase();
+      const entityFilePath = path.join(moduleFolder, 'entities', `${kebabEntity}.entity.ts`);
+      ensureModuleRegisters(moduleFolder, entityFilePath, { registerController: true });
+    } catch (e) {
+      
+    }
   } catch (err: any) {
     vscode.window.showErrorMessage(`Error generating Controller: ${err.message}`);
   }

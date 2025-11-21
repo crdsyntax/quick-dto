@@ -72,6 +72,36 @@
         "command": "nest-tools.controllerByFunction",
         "title": "Generate Controller Endpoint",
         "category": "NestJS"
+      },
+      {
+        "command": "nest-tools.generateDiagram",
+        "title": "Generate diagram",
+        "category": "NestJS"
+      },
+      {
+        "command": "nest-tools.generateEntity",
+        "title": "Generate Entity",
+        "category": "NestJS"
+      },
+      {
+        "command": "nest-tools.generateEntityFromPalette",
+        "title": "NestJS: Generate Entity",
+        "category": "NestJS"
+      },
+      {
+        "command": "nest-tools.convertOrm",
+        "title": "NestJS: Convert ORM (TypeORM ↔ Mongoose)",
+        "category": "NestJS Tools"
+      },
+      {
+        "command": "nest-tools.migrateToTypeOrm",
+        "title": "NestJS: Migrate Mongoose to TypeORM",
+        "category": "NestJS Tools"
+      },
+      {
+        "command": "nest-tools.exploreDataDictionary",
+        "title": "NestJS: Explore Data Dictionary",
+        "category": "NestJS Tools"
       }
     ],
     "menus": {
@@ -100,6 +130,25 @@
           "command": "nest-dto-generator.generateController",
           "when": "resourceFilename =~ /\\.(entity|service)\\.ts$/",
           "group": "nestjs@5"
+        },
+        {
+          "command": "nest-tools.generateDiagram",
+          "when": "resourceFilename =~ /\\.entity\\.ts$/",
+          "group": "nestjs@5"
+        },
+        {
+          "command": "nest-tools.generateEntity",
+          "group": "navigation",
+          "when": "explorerResourceIsFolder"
+        },
+        {
+          "command": "nest-tools.convertOrm",
+          "group": "nestjs",
+          "when": "resourceExtname == .ts"
+        },
+        {
+          "command": "nest-tools.exploreDataDictionary",
+          "group": "nestjs"
         }
       ],
       "editor/context": [
@@ -112,6 +161,20 @@
           "command": "nest-tools.controllerByFunction",
           "when": "editorHasSelection && editorLangId == typescript",
           "group": "nestjs@5"
+        }
+      ],
+      "command-palette": [
+        {
+          "command": "nest-tools.generateEntityFromPalette"
+        },
+        {
+          "command": "nest-tools.convertOrm"
+        },
+        {
+          "command": "nest-tools.migrateToTypeOrm"
+        },
+        {
+          "command": "nest-tools.exploreDataDictionary"
         }
       ]
     },

@@ -1,4 +1,3 @@
-// src/utils/stringUtils.ts
 export function toPascalCase(str: string): string {
   return str
     .replace(/[-_\s]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ""))

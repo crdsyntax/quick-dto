@@ -75,7 +75,7 @@ export function generateControllerContentFromService(
       pascalEntity
     )}" })\n`;
 
-    // Agregar tipos de respuesta específicos
+    
     if (m.name === "create") {
       content += `  @ApiResponse({ status: 201, type: ${pascalEntity} })\n`;
     } else if (m.name === "findAll") {

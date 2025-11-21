@@ -1,4 +1,3 @@
-// src/utils/astUtils.ts
 import * as ts from "typescript";
 
 export function getInferredReturnType(sourceFile: ts.SourceFile, position: ts.LineAndCharacter): string {
@@ -37,19 +36,19 @@ export function getInferredReturnType(sourceFile: ts.SourceFile, position: ts.Li
       const callSig = node.expression.getText();
       const typeArg = node.typeArguments?.[0];
 
-      // save(...) → retorna la entidad
+      
       if (callSig.includes(".save(")) {
         const arg = node.arguments[0];
         if (arg) inferred = getTypeFromExpression(arg) || inferred;
       }
 
-      // findOne(...) → retorna entidad | null → Promise<Entidad>
+      
       if (callSig.includes(".findOne")) {
         const entityType = extractEntityFromRepositoryCall(callSig);
         if (entityType) inferred = entityType;
       }
 
-      // find(...) → Promise<Entidad[]>
+      
       if (callSig.includes(".find(")) {
         const entityType = extractEntityFromRepositoryCall(callSig);
         if (entityType) inferred = `${entityType}[]`;
@@ -60,12 +59,12 @@ export function getInferredReturnType(sourceFile: ts.SourceFile, position: ts.Li
   const getTypeFromExpression = (expr: ts.Expression): string | null => {
     const text = expr.getText();
 
-    // new Product() → Product
+    
     if (text.startsWith("new ")) {
       return text.split("new ")[1].split("(")[0].trim();
     }
 
-    // repository.save(product) → product es Product
+    
     if (ts.isPropertyAccessExpression(expr) && text.includes(".save")) {
       const obj = (expr.expression as any).getText();
       if (obj.match(/^[a-z]/)) {
@@ -73,7 +72,7 @@ export function getInferredReturnType(sourceFile: ts.SourceFile, position: ts.Li
       }
     }
 
-    // Directo: product, user, etc.
+    
     if (ts.isIdentifier(expr)) {
       return inferTypeFromVariable(text);
     }

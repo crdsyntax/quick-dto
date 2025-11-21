@@ -3,6 +3,7 @@ import * as path from "path";
 import * as fs from "fs";
 import { toCamelCase, toPascalCase } from "../utils/case.util";
 import { writeFileSafely } from "../utils/file.utils";
+import { ensureModuleRegisters } from "../utils/module.util";
 import { generateRepositoryContent } from "../generators/repository.generator";
 
 
@@ -27,6 +28,12 @@ export async function generateRepositoryCommand(uri?: vscode.Uri) {
     const content = generateRepositoryContent(camelEntity, pascalEntity);
 
     await writeFileSafely(repoPath, content, "Repository generated");
+    try {
+      const moduleFolder = path.dirname(path.dirname(entityPath));
+      ensureModuleRegisters(moduleFolder, entityPath, { registerRepository: true });
+    } catch (e) {
+      
+    }
   } catch (err: any) {
     vscode.window.showErrorMessage(`Error generating Repository: ${err.message}`);
   }

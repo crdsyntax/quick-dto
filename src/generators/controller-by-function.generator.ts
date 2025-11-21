@@ -32,7 +32,7 @@ export function parseFunction(functionText: string): FunctionInfo | null {
     /async\s+(\w+)\(\s*(\w+)\s*:\s*number\s*\)\s*:\s*Promise<(\w+)>\s*\{[^}]*remove[^}]*\}/s,
     /async\s+(\w+)\(([^)]*)\)\s*:\s*Promise<([^>]+)>\s*\{([^}]+)\}/,
 
-    // nuevos:
+    
     /(?:public|private|protected|async|\s)*\s*(\w+)\s*\(([^)]*)\)\s*:\s*Promise<([^>]+)>\s*\{[^}]*\}/s,
     /(?:public|private|protected|async|\s)*(\w+)\s*\(([^)]*)\)\s*:\s*([A-Za-z0-9_<>\[\]]+)\s*\{[^}]*\}/s,
     /(\w+)\s*=\s*\(([^)]*)\)\s*:\s*Promise<([^>]+)>\s*=>\s*\{[^}]*\}/s,
@@ -240,8 +240,8 @@ export async function getOrCreateControllerFile(
         const files = fs.readdirSync(dir);
         if (files.some((f) => f.endsWith(".module.ts"))) return dir;
       } catch (e) {
-        // ignore
-      }
+        
+        }
       const parent = path.dirname(dir);
       if (!parent || parent === dir) break;
       dir = parent;

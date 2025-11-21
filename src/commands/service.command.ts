@@ -4,6 +4,7 @@ import * as fs from "fs";
 import { toCamelCase, toPascalCase } from "../utils/case.util";
 import { generateServiceContent } from "../generators/service.generator";
 import { writeFileSafely } from "../utils/file.utils";
+import { ensureModuleRegisters } from "../utils/module.util";
 
 
 export async function generateServiceCommand(uri?: vscode.Uri) {
@@ -27,6 +28,12 @@ export async function generateServiceCommand(uri?: vscode.Uri) {
     const content = generateServiceContent(camelEntity, pascalEntity);
 
     await writeFileSafely(servicePath, content, "Service generated");
+    try {
+      const moduleFolder = path.dirname(path.dirname(entityPath));
+      ensureModuleRegisters(moduleFolder, entityPath, { registerService: true });
+    } catch (e) {
+      
+    }
   } catch (err: any) {
     vscode.window.showErrorMessage(`Error generating Service: ${err.message}`);
   }
