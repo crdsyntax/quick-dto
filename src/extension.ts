@@ -12,6 +12,7 @@ import { registerDiagramCommand } from "./commands/diagram.command";
 import { EntityGenerator } from "./commands/entity.command";
 import { OrmConverter } from "./commands/convert.command";
 import { MongooseToTypeOrmMigrator } from "./commands/migration.command";
+import { generateErdCommand } from "./commands/erd-generator.command";
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("NestJS Tools Generador actived");
@@ -68,7 +69,11 @@ export function activate(context: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand(
       "nest-tools.migrateToTypeOrm", MongooseToTypeOrmMigrator.migrateToTypeOrm
-    )
+    ),
+    vscode.commands.registerCommand(
+      "nest-tools.generateErd", generateErdCommand
+    ),
+
   );
 
   context.subscriptions.push(
