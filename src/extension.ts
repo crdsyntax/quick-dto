@@ -15,7 +15,6 @@ import { MongooseToTypeOrmMigrator } from "./commands/migration.command";
 import { generateErdCommand } from "./commands/erd-generator.command";
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log("NestJS Tools Generador actived");
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -82,7 +81,7 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  vscode.window.showInformationMessage("NestJS Tools Activado - ¡Comandos de conversión ORM disponibles!");
+  vscode.window.showInformationMessage("NestJS Tools Activado 🚀 v2.106.0");
 }
 
 export function deactivate() {

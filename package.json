@@ -2,7 +2,7 @@
   "name": "nest-helper-files",
   "displayName": "NestJS tools Generator",
   "description": "Genera DTOs con Swagger, Repository, Service, Controller y CRUD completo desde entidades TypeORM. Incluye autocompletado inteligente de funciones en controladores.",
-  "version": "2.5.0",
+  "version": "2.106.0",
   "publisher": "crdsyntax",
   "icon": "src/image/logo.jpg",
   "repository": {
@@ -128,22 +128,22 @@
         },
         {
           "command": "nest-dto-generator.generateCrud",
-          "when": "resourceFilename =~ /\\.entity\\.ts$/",
+          "when": "resourceFilename =~ /\\.(entity|schema)\\.ts$/",
           "group": "nestjs@2"
         },
         {
           "command": "nest-dto-generator.generateRepository",
-          "when": "resourceFilename =~ /\\.entity\\.ts$/",
+          "when": "resourceFilename =~ /\\.(entity|schema)\\.ts$/",
           "group": "nestjs@3"
         },
         {
           "command": "nest-dto-generator.generateService",
-          "when": "resourceFilename =~ /\\.entity\\.ts$/",
+          "when": "resourceFilename =~ /\\.(entity|schema)\\.ts$/",
           "group": "nestjs@4"
         },
         {
           "command": "nest-dto-generator.generateController",
-          "when": "resourceFilename =~ /\\.(entity|service)\\.ts$/",
+          "when": "resourceFilename =~ /\\.(entity|service|schema)\\.ts$/",
           "group": "nestjs@5"
         },
         {

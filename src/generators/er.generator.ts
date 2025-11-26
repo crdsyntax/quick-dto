@@ -1,112 +1,130 @@
 import { Project } from "ts-morph";
 import * as fs from "fs";
+import * as path from "path";
 import { execSync } from "child_process";
 
-export async function generateErd(
-    rootPath: string,
-    rootEntityName: string,
-    depth = 2
-) {
-    const ENTITIES_PATH = rootPath + "/src/**/*.entity.ts";
-    const OUTPUT_MERMAID = rootPath + "/diagram.mmd";
-    const OUTPUT_IMAGE = rootPath + "/diagram.png";
+function logStep(msg: string) {
+    process.stdout.write(`\n[WORKFLOW] ${msg}...\n`);
+}
 
-    const project = new Project({
-        tsConfigFilePath: rootPath + "/tsconfig.json",
-    });
+export async function generateErd(rootPath: string, rootEntityName: string, depth = 2) {
+    logStep("Verificando dependencias de Mermaid");
+
+    try {
+        execSync("npx mmdc -V", { stdio: "ignore" });
+    } catch {
+        logStep("Instalando @mermaid-js/mermaid-cli");
+        execSync("npm install -D @mermaid-js/mermaid-cli", { stdio: "inherit" });
+    }
+
+    logStep("Inicializando proyecto y escaneo de entidades");
+
+    const ENTITIES_PATH = rootPath + "/src/**/*.entity.ts";
+    const ERD_DIR = path.join(rootPath, "src", "erd");
+
+    if (!fs.existsSync(ERD_DIR)) fs.mkdirSync(ERD_DIR, { recursive: true });
+
+    const OUTPUT_MERMAID = path.join(ERD_DIR, "diagram.mmd");
+    const OUTPUT_IMAGE = path.join(ERD_DIR, "diagram.png");
+
+    const project = new Project({ tsConfigFilePath: rootPath + "/tsconfig.json" });
     const sourceFiles = project.addSourceFilesAtPaths(ENTITIES_PATH);
 
-    const entities: Record<string, { columns: string[]; relations: string[] }> =
-        {};
+    logStep("Parseando entidades");
+
+    const entities: Record<string, { columns: string[]; relations: string[] }> = {};
 
     for (const file of sourceFiles) {
-        const cls = file.getClasses()[0];
-        if (!cls) continue;
+        const classes = file.getClasses();
+        for (const cls of classes) {
+            const name = cls.getName();
+            if (!name) continue;
 
-        const name = cls.getName();
-        if (!name) continue;
-        entities[name] = { columns: [], relations: [] };
+            entities[name] = { columns: [], relations: [] };
 
-        const props = cls.getProperties();
-        for (const prop of props) {
-            const decorators = prop.getDecorators().map((d) => d.getName());
+            const props = cls.getProperties();
+            for (const prop of props) {
+                const decorators = prop.getDecorators().map((d) => d.getName());
 
-            if (decorators.includes("Column")) {
-                entities[name].columns.push(prop.getName());
-            }
+                if (decorators.includes("Column")) {
+                    entities[name].columns.push(prop.getName());
+                }
 
-            if (
-                decorators.includes("ManyToOne") ||
-                decorators.includes("OneToMany") ||
-                decorators.includes("OneToOne") ||
-                decorators.includes("ManyToMany")
-            ) {
-                const decorator = prop
-                    .getDecorators()
-                    .find((d) =>
-                        ["ManyToOne", "OneToMany", "OneToOne", "ManyToMany"].includes(
-                            d.getName()
-                        )
-                    );
+                const relDecor = prop.getDecorators().find((d) =>
+                    ["ManyToOne", "OneToMany", "OneToOne", "ManyToMany"].includes(d.getName())
+                );
 
-                let relTypeName = "";
+                if (relDecor) {
+                    let relTypeName = "";
+                    const arg = relDecor.getArguments()[0];
 
-                if (decorator) {
-                    const arg = decorator.getArguments()[0]?.getText();
                     if (arg) {
-                        const match = arg.match(/=>\s*(\w+)/);
-                        if (match) relTypeName = match[1];
+                        const txt = arg.getText();
+                        const found = txt.match(/=>\s*([^.)\s]+)/);
+                        if (found) relTypeName = found[1];
+                    }
+
+                    if (!relTypeName) {
+                        relTypeName = prop.getType().getText()
+                            .replace(/\[\]$/, "")
+                            .replace(/Promise<(.+)>/, "$1");
+                    }
+
+                    if (relTypeName && relTypeName !== name) {
+                        entities[name].relations.push(relTypeName);
                     }
                 }
-
-                if (!relTypeName) {
-                    relTypeName = prop
-                        .getType()
-                        .getText()
-                        .replace("[]", "")
-                        .replace("Promise<", "")
-                        .replace(">", "");
-                }
-
-                if (relTypeName) entities[name].relations.push(relTypeName);
             }
         }
     }
 
+    logStep("Resolviendo grafo de relaciones");
+
     const visited = new Set<string>();
-    const queue: Array<{ name: string; level: number }> = [
-        { name: rootEntityName, level: 0 },
-    ];
-    const subEntities: Record<string, (typeof entities)[string]> = {};
+    const queue: Array<{ name: string; level: number }> = [{ name: rootEntityName, level: 0 }];
+    const subEntities: Record<string, typeof entities[string]> = {};
 
     while (queue.length > 0) {
         const { name, level } = queue.shift()!;
         if (visited.has(name) || level > depth) continue;
+
         visited.add(name);
         if (!entities[name]) continue;
+
         subEntities[name] = entities[name];
 
         for (const rel of entities[name].relations) {
-            queue.push({ name: rel, level: level + 1 });
+            if (entities[rel]) queue.push({ name: rel, level: level + 1 });
         }
     }
 
+    logStep("Generando archivo Mermaid");
+
     let mermaid = "classDiagram\n";
 
+    if (Object.keys(subEntities).length === 0) {
+        mermaid += "class Dummy { id int }\n";
+    }
+
     for (const [entity, data] of Object.entries(subEntities)) {
-        mermaid += ` class ${entity} {\n`;
-        data.columns.forEach((c) => (mermaid += ` + ${c}\n`));
-        mermaid += " }\n\n";
+        mermaid += `class ${entity} {\n`;
+        data.columns.forEach((c) => (mermaid += `  + ${c}\n`));
+        mermaid += "}\n\n";
     }
 
     for (const [entity, data] of Object.entries(subEntities)) {
         data.relations.forEach((target) => {
-            if (subEntities[target]) {
-                mermaid += ` ${entity} --> ${target}\n`;
-            }
+            if (subEntities[target]) mermaid += `${entity} --> ${target}\n`;
         });
     }
 
-    fs.writeFileSync(OUTPUT_MERMAID, mermaid);
-    execSync(`mmdc -i ${OUTPUT_MERMAID} -o ${OUTPUT_IMAGE}`);
+    fs.writeFileSync(OUTPUT_MERMAID, mermaid.trim());
+
+    logStep("Renderizando imagen final");
+
+    execSync(`npx mmdc -i "${OUTPUT_MERMAID}" -o "${OUTPUT_IMAGE}"`, {
+        stdio: "inherit",
+    });
+
+    logStep("Proceso completado");
 }
