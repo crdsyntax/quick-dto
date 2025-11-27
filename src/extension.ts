@@ -13,8 +13,20 @@ import { EntityGenerator } from "./commands/entity.command";
 import { OrmConverter } from "./commands/convert.command";
 import { MongooseToTypeOrmMigrator } from "./commands/migration.command";
 import { generateErdCommand } from "./commands/erd-generator.command";
+import {
+  EntityTreeDataProvider,
+  EntityItem,
+} from "./views/entity-tree-provider";
+import { EntityVisualizer } from "./views/erd-visualizer";
 
 export function activate(context: vscode.ExtensionContext) {
+  const entityTreeProvider = new EntityTreeDataProvider(
+    vscode.workspace.rootPath
+  );
+  vscode.window.registerTreeDataProvider(
+    "nest-tools.entityView",
+    entityTreeProvider
+  );
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -58,21 +70,48 @@ export function activate(context: vscode.ExtensionContext) {
       registerDiagramCommand
     ),
     vscode.commands.registerCommand(
-      "nest-tools.generateEntity", EntityGenerator.generateEntity
+      "nest-tools.generateEntity",
+      EntityGenerator.generateEntity
     ),
     vscode.commands.registerCommand(
-      "nest-tools.generateEntityFromPalette", EntityGenerator.generateEntity
+      "nest-tools.generateEntityFromPalette",
+      EntityGenerator.generateEntity
     ),
     vscode.commands.registerCommand(
-      "nest-tools.convertOrm", OrmConverter.convertOrm
+      "nest-tools.convertOrm",
+      OrmConverter.convertOrm
     ),
     vscode.commands.registerCommand(
-      "nest-tools.migrateToTypeOrm", MongooseToTypeOrmMigrator.migrateToTypeOrm
+      "nest-tools.migrateToTypeOrm",
+      MongooseToTypeOrmMigrator.migrateToTypeOrm
     ),
     vscode.commands.registerCommand(
-      "nest-tools.generateErd", generateErdCommand
+      "nest-tools.generateErd",
+      generateErdCommand
     ),
-
+    vscode.commands.registerCommand(
+      "nest-tools.viewEntityErd",
+      (item: EntityItem) => {
+        if (item && item.label) {
+          EntityVisualizer.createOrShow(
+            context.extensionUri,
+            item.label,
+            vscode.workspace.rootPath || ""
+          );
+        }
+      }
+    ),
+    vscode.commands.registerCommand("nest-tools.searchEntities", async () => {
+      const value = await vscode.window.showInputBox({
+        placeHolder: "Search entities...",
+      });
+      if (value !== undefined) {
+        entityTreeProvider.filter(value);
+      }
+    }),
+    vscode.commands.registerCommand("nest-tools.clearSearchEntities", () => {
+      entityTreeProvider.filter("");
+    })
   );
 
   context.subscriptions.push(

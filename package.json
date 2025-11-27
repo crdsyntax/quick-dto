@@ -32,6 +32,23 @@
     "*"
   ],
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "nest-tools-explorer",
+          "title": "NestJS Tools",
+          "icon": "src/image/logo.jpg"
+        }
+      ]
+    },
+    "views": {
+      "nest-tools-explorer": [
+        {
+          "id": "nest-tools.entityView",
+          "name": "Entities"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "nest-dto-generator.generateDto",
@@ -112,9 +129,38 @@
         "command": "nest-tools.generateErd",
         "title": "NestJS: Generate ER Diagram",
         "category": "NestJS"
+      },
+      {
+        "command": "nest-tools.viewEntityErd",
+        "title": "View ER Diagram",
+        "category": "NestJS"
+      },
+      {
+        "command": "nest-tools.searchEntities",
+        "title": "Search Entities",
+        "category": "NestJS",
+        "icon": "$(search)"
+      },
+      {
+        "command": "nest-tools.clearSearchEntities",
+        "title": "Clear Search",
+        "category": "NestJS",
+        "icon": "$(clear-all)"
       }
     ],
     "menus": {
+      "view/title": [
+        {
+          "command": "nest-tools.searchEntities",
+          "when": "view == nest-tools.entityView",
+          "group": "navigation"
+        },
+        {
+          "command": "nest-tools.clearSearchEntities",
+          "when": "view == nest-tools.entityView",
+          "group": "navigation"
+        }
+      ],
       "explorer/context": [
         {
           "command": "nest-dto-generator.generateDto",
@@ -212,15 +258,16 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile -- --production",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
     "package": "vsce package",
     "publish": "vsce publish"
   },
   "devDependencies": {
     "@types/node": "^18.x",
     "@types/vscode": "^1.80.0",
+    "esbuild": "^0.27.0",
     "vsce": "^2.15.0"
   },
   "dependencies": {
