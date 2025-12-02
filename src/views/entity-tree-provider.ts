@@ -49,11 +49,20 @@ export class EntityTreeDataProvider
   }
 
   private async getEntitiesInSrc(srcPath: string): Promise<EntityItem[]> {
-    const pattern = new vscode.RelativePattern(srcPath, "**/*.entity.ts");
-    const files = await vscode.workspace.findFiles(pattern);
+    const entityPattern = new vscode.RelativePattern(srcPath, "**/*.entity.ts");
+    const schemaPattern = new vscode.RelativePattern(srcPath, "**/*.schema.ts");
 
-    const items = files.map((file) => {
-      const name = path.basename(file.fsPath, ".entity.ts");
+    const entityFiles = await vscode.workspace.findFiles(entityPattern);
+    const schemaFiles = await vscode.workspace.findFiles(schemaPattern);
+
+    const allFiles = [...entityFiles, ...schemaFiles];
+
+    const items = allFiles.map((file) => {
+      const isEntity = file.fsPath.endsWith(".entity.ts");
+      const extensionToRemove = isEntity ? ".entity.ts" : ".schema.ts";
+
+      const name = path.basename(file.fsPath, extensionToRemove);
+
       return new EntityItem(
         name,
         file.fsPath,

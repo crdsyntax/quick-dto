@@ -1,267 +1,289 @@
-import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'fs';
-import { SmartEntityGenerator } from '../generators/entity.generator';
-import { DataDictionary } from '../dictionaries/data.dictionary';
+import * as vscode from "vscode";
+import { SmartEntityGenerator } from "../generators/entity.generator";
 
-// Interfaces para los items del QuickPick
-interface QuickPickModuleItem extends vscode.QuickPickItem {
-    module: any;
-}
+export class EntityCommand {
+  /**
+   * Entry point for entity generation
+   * Shows options for dictionary-based or manual creation
+   */
+  public static async generateEntity(uri?: vscode.Uri) {
+    try {
+      const options = [
+        {
+          label: "$(database) Desde Diccionario",
+          description: "Usa plantillas predefinidas",
+          detail: "Selecciona entre entidades comunes preconfiguradas",
+        },
+        {
+          label: "$(edit) Manualmente",
+          description: "Crear entidad desde cero",
+          detail: "Define manualmente todos los campos y relaciones",
+        },
+      ];
 
-interface QuickPickEntityItem extends vscode.QuickPickItem {
-    entity: any;
-}
+      const selection = await vscode.window.showQuickPick(options, {
+        placeHolder: "¿Cómo quieres crear la entidad?",
+        ignoreFocusOut: true,
+      });
 
-interface QuickPickFieldItem extends vscode.QuickPickItem {
-    field: any;
-}
+      if (!selection) {
+        return;
+      }
 
-interface QuickPickRelationItem extends vscode.QuickPickItem {
-    relation: any;
-}
+      if (selection.label.includes("Diccionario")) {
+        await SmartEntityGenerator.generateEntityFromDictionary();
+      } else {
+          await EntityCommand.generateEntityManually(uri);
+      }
+    } catch (err: any) {
+      vscode.window.showErrorMessage(
+        `Error al iniciar creación de entidad: ${err.message}`
+      );
+      console.error("Error en generateEntity:", err);
+    }
+  }
 
-export class EntityGenerator {
-    public static async generateEntity() {
-        const options = [
-            {
-                label: '$(database) Desde Diccionario',
-                description: 'Seleccionar entidad predefinida del diccionario',
-                detail: 'Usa plantillas predefinidas con campos y relaciones comunes'
-            },
-            {
-                label: '$(edit) Manualmente',
-                description: 'Crear entidad personalizada desde cero',
-                detail: 'Define todos los campos y relaciones manualmente'
-            }
-        ];
-
-        const selection = await vscode.window.showQuickPick(options, {
-            placeHolder: '¿Cómo quieres crear la entidad?',
-        });
-
-        if (!selection) return;
-
-        if (selection.label.includes('Diccionario')) {
-            await SmartEntityGenerator.generateEntityFromDictionary();
-        } else {
-            
-            await this.generateEntityManually();
+  /**
+   * Manual entity generation flow
+   * Prompts user for entity details and creates files
+   */
+  private static async generateEntityManually(uri?: vscode.Uri) {
+    try {
+      // 1️⃣ Selección del ORM
+      const orm = await vscode.window.showQuickPick(
+        [
+          {
+            label: "TypeORM",
+            description: "Para aplicaciones NestJS con TypeORM",
+            detail: "Genera entidades con decoradores @Entity()",
+          },
+          {
+            label: "Mongoose",
+            description: "Para aplicaciones NestJS con MongoDB",
+            detail: "Genera esquemas con @Schema()",
+          },
+        ],
+        {
+          placeHolder: "Selecciona el ORM",
+          ignoreFocusOut: true,
         }
-    }
+      );
 
-    private static async generateEntityManually() {
-        const entityName = await vscode.window.showInputBox({
-            prompt: 'Nombre de la entidad (ej: User, Product, Category)',
-            placeHolder: 'Ingresa el nombre de la entidad en PascalCase',
-            validateInput: (value) => {
-                if (!value || value.trim().length === 0) return 'El nombre de la entidad es requerido';
-                if (!/^[A-Z][a-zA-Z0-9]*$/.test(value)) return 'El nombre debe estar en PascalCase (ej: User, ProductCategory)';
-                return null;
-            }
+      if (!orm) {
+        return;
+      }
+
+      const ormType = orm.label;
+
+      // 2️⃣ Nombre de la entidad
+      const entityName = await vscode.window.showInputBox({
+        prompt: "Nombre de la entidad (PascalCase)",
+        placeHolder: "Ej: User, ProductCategory, OrderDetail",
+        validateInput: (value) => {
+          if (!value || value.trim().length === 0) {
+            return "El nombre es requerido";
+          }
+          if (!/^[A-Z][a-zA-Z0-9]*$/.test(value)) {
+            return "Debe estar en PascalCase (ej: User, ProductCategory)";
+          }
+          if (value.length < 2) {
+            return "El nombre debe tener al menos 2 caracteres";
+          }
+          return null;
+        },
+        ignoreFocusOut: true,
+      });
+
+      if (!entityName) {
+        return;
+      }
+
+      // 3️⃣ Nombre del módulo
+      const defaultModule = this.toKebabCase(entityName);
+      const moduleName = await vscode.window.showInputBox({
+        prompt: "Nombre del módulo (carpeta donde se creará)",
+        value: defaultModule,
+        placeHolder: defaultModule,
+        validateInput: (value) => {
+          if (!value || value.trim().length === 0) {
+            return "El nombre del módulo es requerido";
+          }
+          if (!/^[a-z0-9\-_]+$/.test(value)) {
+            return "Solo minúsculas, números, guiones y guiones bajos";
+          }
+          if (value.includes(" ")) {
+            return "No se permiten espacios";
+          }
+          return null;
+        },
+        ignoreFocusOut: true,
+      });
+
+      if (!moduleName) {
+        return;
+      }
+
+      // 4️⃣ Confirmar creación
+      const confirm = await vscode.window.showWarningMessage(
+        `¿Crear entidad "${entityName}" en módulo "${moduleName}" con ${ormType}?`,
+        { modal: true },
+        "Sí, crear",
+        "Cancelar"
+      );
+
+      if (confirm !== "Sí, crear") {
+        return;
+      }
+
+      // 5️⃣ Determinar la ruta base
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
+      if (!workspaceRoot) {
+        vscode.window.showErrorMessage("No se encontró el workspace abierto");
+        return;
+      }
+
+      // 6️⃣ Obtener estructura de directorios
+      const structure = await SmartEntityGenerator["determinePaths"](
+        moduleName,
+        ormType,
+        uri || workspaceRoot
+      );
+
+      // 7️⃣ Definición básica de la entidad
+      const entityDef = {
+        name: entityName,
+        description: `${entityName} entity`,
+        tableName: this.toSnakeCase(entityName),
+        fields: [
+          {
+            name: "id",
+            type: ormType === "TypeORM" ? "number" : "string",
+            required: true,
+            isRelation: false,
+            isPrimary: true,
+            decorator:
+              ormType === "TypeORM" ? "@PrimaryGeneratedColumn()" : "@Prop()",
+            description: "Identificador único",
+          },
+          {
+            name: "name",
+            type: "string",
+            required: true,
+            isRelation: false,
+            decorator:
+              ormType === "TypeORM" ? "@Column()" : "@Prop({ required: true })",
+            description: "Nombre de la entidad",
+          },
+          {
+            name: "isActive",
+            type: "boolean",
+            required: false,
+            default: true,
+            isRelation: false,
+            decorator:
+              ormType === "TypeORM"
+                ? "@Column({ default: true })"
+                : "@Prop({ default: true })",
+            description: "Indica si la entidad está activa",
+          },
+          {
+            name: "createdAt",
+            type: "Date",
+            required: false,
+            default: ormType === "TypeORM" ? "CURRENT_TIMESTAMP" : "Date.now",
+            isRelation: false,
+            decorator:
+              ormType === "TypeORM"
+                ? "@CreateDateColumn()"
+                : "@Prop({ default: Date.now })",
+            description: "Fecha de creación",
+          },
+          {
+            name: "updatedAt",
+            type: "Date",
+            required: false,
+            isRelation: false,
+            decorator:
+              ormType === "TypeORM" ? "@UpdateDateColumn()" : "@Prop()",
+            description: "Fecha de última actualización",
+          },
+        ],
+        relations: [],
+        orm: ormType,
+      };
+
+      // 8️⃣ Crear archivos
+      await SmartEntityGenerator["createEntityFile"](
+        entityDef,
+        structure,
+        ormType
+      );
+      await SmartEntityGenerator["createModuleFileIfNotExists"](
+        entityDef,
+        structure,
+        ormType
+      );
+
+      // 9️⃣ Mostrar notificación de éxito
+      vscode.window
+        .showInformationMessage(
+          `✅ Entidad ${entityName} creada exitosamente en módulo ${moduleName}`,
+          "Abrir archivo",
+          "Abrir carpeta"
+        )
+        .then(async (selection) => {
+          const fileName = `${this.toKebabCase(entityName)}.${
+            ormType === "TypeORM" ? "entity.ts" : "schema.ts"
+          }`;
+          const filePath = vscode.Uri.joinPath(
+            vscode.Uri.file(structure.targetDir),
+            fileName
+          );
+
+          if (selection === "Abrir archivo") {
+            const document = await vscode.workspace.openTextDocument(filePath);
+            await vscode.window.showTextDocument(document);
+          } else if (selection === "Abrir carpeta") {
+            vscode.commands.executeCommand(
+              "revealFileInOS",
+              vscode.Uri.file(structure.targetDir)
+            );
+          }
         });
-
-        if (!entityName) return;
-
-        const defaultModule = entityName.toLowerCase();
-        const moduleName = await vscode.window.showInputBox({
-            prompt: 'Nombre del módulo (carpeta donde se creará la entidad)',
-            placeHolder: `Ingresa el nombre del módulo (por defecto: ${defaultModule})`,
-            value: defaultModule,
-            validateInput: (value) => {
-                if (!value || value.trim().length === 0) return 'El nombre del módulo es requerido';
-                if (!/^[a-zA-Z0-9\-_]+$/.test(value)) return 'Solo letras, números, guiones y guiones bajos';
-                return null;
-            }
-        });
-
-        if (!moduleName) return;
-
-        const orm = await vscode.window.showQuickPick(['TypeORM', 'Mongoose'], { placeHolder: 'Selecciona el ORM a utilizar' });
-        if (!orm) return;
-
-        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (!workspaceRoot) {
-            vscode.window.showErrorMessage('No se encontró la carpeta del workspace');
-            return;
-        }
-
-        const moduleDir = path.join(workspaceRoot, 'src', moduleName);
-    const entityDir = orm === 'Mongoose' ? path.join(moduleDir, 'schemas') : path.join(moduleDir, 'entities'); // usar 'schemas' para Mongoose
-
-        try {
-            fs.mkdirSync(entityDir, { recursive: true });
-
-            const kebabEntity = this.pascalToKebab(entityName);
-            const entityFile = path.join(entityDir, orm === 'Mongoose' ? `${kebabEntity}.schema.ts` : `${kebabEntity}.entity.ts`);
-
-            const moduleFile = path.join(moduleDir, `${this.toKebabCase(moduleName)}.module.ts`);
-
-            const entityContent = this.generateEntityTemplateForManual(entityName, orm);
-            fs.writeFileSync(entityFile, entityContent, 'utf8');
-
-            const moduleContent = this.generateModuleTemplateForManual(entityName, moduleName, orm);
-            fs.writeFileSync(moduleFile, moduleContent, 'utf8');
-
-            vscode.window.showInformationMessage(`Entidad ${entityName} creada en ${entityDir}`);
-        } catch (err: any) {
-            vscode.window.showErrorMessage(`Error al crear la entidad: ${err?.message || err}`);
-        }
+    } catch (err: any) {
+      vscode.window.showErrorMessage(
+        `Error al crear la entidad: ${err.message || "Error desconocido"}`
+      );
+      console.error("Error detallado en generateEntityManually:", err);
     }
+  }
 
-    private static generateEntityTemplateForManual(entityName: string, orm: string): string {
-        const kebab = this.pascalToKebab(entityName);
-        if (orm === 'TypeORM') {
-            return `import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+  /**
+   * Utility: Convert string to kebab-case
+   */
+  private static toKebabCase(str: string): string {
+    return str
+      .replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, "$1-$2")
+      .toLowerCase()
+      .replace(/^-/, "");
+  }
 
-@Entity('${kebab}')
-export class ${entityName} {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  /**
+   * Utility: Convert string to snake_case
+   */
+  private static toSnakeCase(str: string): string {
+    return str
+      .replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, "$1_$2")
+      .toLowerCase()
+      .replace(/^_/, "");
+  }
 
-    @Column({ type: 'varchar', length: 255 })
-    name: string;
-
-    @Column({ type: 'boolean', default: true })
-    isActive: boolean;
-
-    @CreateDateColumn()
-    createdAt: Date;
-
-    @UpdateDateColumn()
-    updatedAt: Date;
-}
-`;
-        }
-
-        return `import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
-
-export type ${entityName}Document = ${entityName} & Document;
-
-@Schema({ timestamps: true, collection: '${kebab}' })
-export class ${entityName} {
-    @Prop({ required: true })
-    name: string;
-
-    @Prop({ default: true })
-    isActive: boolean;
-
-    createdAt?: Date;
-    updatedAt?: Date;
-}
-
-export const ${entityName}Schema = SchemaFactory.createForClass(${entityName});
-`;
-    }
-
-    private static generateModuleTemplateForManual(entityName: string, moduleName: string, orm: string): string {
-        const moduleClass = this.toPascalCase(moduleName) + 'Module';
-        const kebabEntity = this.pascalToKebab(entityName);
-
-                        if (orm === 'TypeORM') {
-                                return `import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { ${entityName} } from './entities/${kebabEntity}.entity';
-
-@Module({
-    imports: [TypeOrmModule.forFeature([${entityName}])],
-    exports: [TypeOrmModule]
-})
-export class ${moduleClass} {}
-`;
-                        }
-
-                        return `import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { ${entityName}, ${entityName}Schema } from './schemas/${kebabEntity}.schema';
-
-@Module({
-    imports: [MongooseModule.forFeature([{ name: ${entityName}.name, schema: ${entityName}Schema }])],
-    exports: [MongooseModule]
-})
-export class ${moduleClass} {}
-`;
-    }
-
-    private static pascalToKebab(str: string): string {
-        return str
-            .replace(/([a-z])([A-Z])/g, '$1-$2')
-            .replace(/([A-Z])([A-Z][a-z])/g, '$1-$2')
-            .replace(/[_ ]/g, '-')
-            .toLowerCase();
-    }
-
-    private static toKebabCase(str: string): string {
-        return this.pascalToKebab(str);
-    }
-
-    private static toPascalCase(str: string): string {
-        return str
-            .split(/[-_ ]+/)
-            .map(s => s.charAt(0).toUpperCase() + s.slice(1))
-            .join('');
-    }
-
-    public static async showDataDictionary() {
-        const modules = DataDictionary.getModuleDefinitions();
-        const moduleItems: QuickPickModuleItem[] = Array.from(modules.entries()).map(([name, module]) => ({
-            label: `$(package) ${name}`,
-            description: module.description,
-            detail: `${module.entities.length} entidades, ${module.dependencies.length} dependencias`,
-            module: module
-        }));
-
-        const selected = await vscode.window.showQuickPick(moduleItems, {
-            placeHolder: 'Explora el diccionario de datos disponible',
-        });
-
-        if (selected) {
-            await this.showModuleDetails(selected.module);
-        }
-    }
-
-    private static async showModuleDetails(module: any) {
-        const entityItems: QuickPickEntityItem[] = module.entities.map((entity: any) => ({
-            label: `$(circuit-board) ${entity.name}`,
-            description: entity.description,
-            detail: `${entity.fields.length} campos, ${entity.relations.length} relaciones`,
-            entity: entity
-        }));
-
-        const selected = await vscode.window.showQuickPick(entityItems, {
-            placeHolder: `Entidades del módulo ${module.name}`,
-        });
-
-        if (selected) {
-            await this.showEntityDetails(selected.entity);
-        }
-    }
-
-    private static async showEntityDetails(entity: any) {
-        const fieldItems: QuickPickFieldItem[] = entity.fields.map((field: any) => ({
-            label: `$(symbol-field) ${field.name}`,
-            description: field.type,
-            detail: `${field.required ? 'Requerido' : 'Opcional'} - ${field.description}`,
-            field: field
-        }));
-
-        const relationItems: QuickPickRelationItem[] = entity.relations.map((relation: any) => ({
-            label: `$(git-compare) ${relation.name}`,
-            description: relation.relationType || 'N/A',
-            detail: `→ ${relation.targetEntity || 'N/A'} - ${relation.description}`,
-            relation: relation
-        }));
-
-        const items: vscode.QuickPickItem[] = [
-            { label: '$(list-tree) CAMPOS', kind: vscode.QuickPickItemKind.Separator },
-            ...fieldItems,
-            { label: '$(git-branch) RELACIONES', kind: vscode.QuickPickItemKind.Separator },
-            ...relationItems
-        ];
-
-        await vscode.window.showQuickPick(items, {
-            placeHolder: `Detalles de ${entity.name}`,
-        });
-    }
+  /**
+   * Utility: Convert string to camelCase
+   */
+  private static toCamelCase(str: string): string {
+    return str
+      .replace(/[-_](.)/g, (_, char) => char.toUpperCase())
+      .replace(/^./, (char) => char.toLowerCase());
+  }
 }

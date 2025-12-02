@@ -9,7 +9,7 @@ import { generateCrudCommand } from "./commands/crud.command";
 import { completeReturnType } from "./autocomplete/functionReturn";
 import { generateControllerEndpoint } from "./commands/controller-by-function.command";
 import { registerDiagramCommand } from "./commands/diagram.command";
-import { EntityGenerator } from "./commands/entity.command";
+import { EntityCommand } from "./commands/entity.command";
 import { OrmConverter } from "./commands/convert.command";
 import { MongooseToTypeOrmMigrator } from "./commands/migration.command";
 import { generateErdCommand } from "./commands/erd-generator.command";
@@ -18,6 +18,7 @@ import {
   EntityItem,
 } from "./views/entity-tree-provider";
 import { EntityVisualizer } from "./views/erd-visualizer";
+import { SocketTesterViewProvider } from "./views/socketView";
 
 export function activate(context: vscode.ExtensionContext) {
   const entityTreeProvider = new EntityTreeDataProvider(
@@ -26,6 +27,14 @@ export function activate(context: vscode.ExtensionContext) {
   vscode.window.registerTreeDataProvider(
     "nest-tools.entityView",
     entityTreeProvider
+  );
+
+  const socketProvider = new SocketTesterViewProvider(context.extensionUri);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      SocketTesterViewProvider.viewId,
+      socketProvider
+    )
   );
 
   context.subscriptions.push(
@@ -66,16 +75,12 @@ export function activate(context: vscode.ExtensionContext) {
       generateControllerEndpoint
     ),
     vscode.commands.registerCommand(
-      "nest-tools.generateDiagram",
-      registerDiagramCommand
-    ),
-    vscode.commands.registerCommand(
       "nest-tools.generateEntity",
-      EntityGenerator.generateEntity
+      EntityCommand.generateEntity
     ),
     vscode.commands.registerCommand(
       "nest-tools.generateEntityFromPalette",
-      EntityGenerator.generateEntity
+      EntityCommand.generateEntity
     ),
     vscode.commands.registerCommand(
       "nest-tools.convertOrm",
@@ -88,6 +93,11 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "nest-tools.generateErd",
       generateErdCommand
+    ),
+    vscode.commands.registerCommand("socketTester.connect", () =>
+      vscode.commands.executeCommand(
+        "workbench.view.extension.socketTesterContainer"
+      )
     ),
     vscode.commands.registerCommand(
       "nest-tools.viewEntityErd",
