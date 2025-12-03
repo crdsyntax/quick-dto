@@ -4,7 +4,7 @@
   "description": "Genera DTOs con Swagger, Repository, Service, Controller y CRUD completo desde entidades TypeORM. Incluye autocompletado inteligente de funciones en controladores.",
   "version": "2.106.1",
   "publisher": "crdsyntax",
-  "icon": "src/image/logo.jpg",
+  "icon": "images/logo.jpg",
   "repository": {
     "type": "git",
     "url": "https://github.com/crdsyntax/quick-dto"
@@ -37,12 +37,12 @@
         {
           "id": "nest-tools-explorer",
           "title": "NestJS Tools",
-          "icon": "src/image/logo.jpg"
+          "icon": "images/entity.svg"
         },
         {
           "id": "socketTesterContainer",
           "title": "Socket Tester",
-          "icon": "src/image/logo.jpg"
+          "icon": "images/socket.svg"
         }
       ]
     },
@@ -50,17 +50,22 @@
       "nest-tools-explorer": [
         {
           "id": "nest-tools.entityView",
-          "name": "Entities"
+          "name": "Entities",
+          "icon": "images/entity.svg"
         }
       ],
       "socketTesterContainer": [
         {
           "id": "socketTesterView",
           "name": "Socket Tester",
-          "type": "webview"
+          "type": "webview",
+          "icon": "images/socket.svg"
         }
       ]
     },
+    "assets": [
+      "media/*.css"
+    ],
     "commands": [
       {
         "command": "nest-dto-generator.generateDto",

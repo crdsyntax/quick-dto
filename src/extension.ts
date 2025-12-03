@@ -96,7 +96,7 @@ export function activate(context: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand("socketTester.connect", () =>
       vscode.commands.executeCommand(
-        "workbench.view.extension.socketTesterContainer"
+        "workbench.view.extension.socketTesterView"
       )
     ),
     vscode.commands.registerCommand(

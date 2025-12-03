@@ -4,7 +4,6 @@ tests/**
 *.map
 *.log
 src/**
-!src/image/logo.jpg
 esbuild.js
 tsconfig.json
 .gitignore
