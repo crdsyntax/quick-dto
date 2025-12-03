@@ -35,7 +35,7 @@ async function main() {
     sourcesContent: false,
     platform: "node",
     outfile: "out/extension.js",
-    external: ["vscode", "socket.io-client", "readline"],
+    external: ["vscode", "readline"],
     logLevel: "silent",
     plugins: [esbuildProblemMatcherPlugin],
     target: "ES2020",

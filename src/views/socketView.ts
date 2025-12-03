@@ -198,10 +198,9 @@ export class SocketTesterViewProvider implements vscode.WebviewViewProvider {
 
   // 3. RECIBIR EL ESTADO EN EL HTML GENERATOR
   private _getHtmlForWebview(
-    webview: vscode.Webview, // El tipo puede ser Webview aquí, ya que no llama a getState/setState
+    webview: vscode.Webview,
     savedState?: SocketTesterState
   ): string {
-    // Generar URIs para los recursos estáticos
     const styleResetUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, "media", "reset.css")
     );
@@ -211,7 +210,6 @@ export class SocketTesterViewProvider implements vscode.WebviewViewProvider {
 
     const nonce = getNonce();
 
-    // VALORES RESTAURADOS O POR DEFECTO
     const defaultUrl = savedState?.url || "http://localhost:3000";
     const defaultToken = savedState?.token || "";
     const defaultUserId = savedState?.userId || "";
@@ -225,15 +223,15 @@ export class SocketTesterViewProvider implements vscode.WebviewViewProvider {
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Socket Tester</title>
-                
                 <link href="${styleResetUri}" rel="stylesheet">
                 <link href="${styleVSCodeUri}" rel="stylesheet">
-                
                 <style>
                     :root {
-                        --container-padding: 10px;
-                        --input-padding: 6px;
-                        --border-radius: 4px;
+                        --container-padding: 16px;
+                        --input-padding: 8px;
+                        --border-radius: 6px;
+                        --bg-secondary: var(--vscode-sideBar-background);
+                        --border-color: var(--vscode-panel-border);
                     }
 
                     body {
@@ -241,351 +239,402 @@ export class SocketTesterViewProvider implements vscode.WebviewViewProvider {
                         display: flex;
                         flex-direction: column;
                         height: 100vh;
-                        overflow: hidden;
+                        font-family: var(--vscode-font-family);
+                        background-color: var(--vscode-editor-background);
+                        color: var(--vscode-editor-foreground);
                     }
 
-                    /* Top Bar: URL & Connect */
-                    .top-bar {
+                    /* Header Section */
+                    .header {
                         padding: var(--container-padding);
-                        background-color: var(--vscode-editor-background);
-                        border-bottom: 1px solid var(--vscode-panel-border);
+                        background-color: var(--bg-secondary);
+                        border-bottom: 1px solid var(--border-color);
+                        display: flex;
+                        flex-direction: column;
+                        gap: 12px;
+                    }
+
+                    .connection-group {
                         display: flex;
                         gap: 8px;
-                        align-items: center;
+                        align-items: flex-end;
                     }
 
-                    .url-input-group {
+                    .input-wrapper {
                         flex-grow: 1;
                         display: flex;
                         flex-direction: column;
-                    }
-                    
-                    .url-input-group label {
-                        font-size: 10px;
-                        margin-bottom: 2px;
-                        color: var(--vscode-descriptionForeground);
+                        gap: 4px;
                     }
 
-                    .action-buttons {
-                        display: flex;
-                        gap: 5px;
-                        margin-top: 14px; /* Align with input */
-                    }
-
-                    /* Status Bar */
-                    .status-bar {
-                        padding: 4px 10px;
+                    label {
                         font-size: 11px;
-                        font-weight: bold;
-                        text-align: center;
-                        color: var(--vscode-editor-background);
-                    }
-                    .disconnected { background-color: var(--vscode-statusBarItem-errorBackground); }
-                    .connected { background-color: var(--vscode-statusBarItem-warningBackground); color: var(--vscode-statusBarItem-warningForeground); } /* Postman uses orange/yellow for active sometimes, or green */
-                    .connected { background-color: #198754; color: white; } /* Bootstrap Success Green */
-                    .error { background-color: var(--vscode-errorForeground); color: white; }
-                    .connecting { background-color: var(--vscode-progressBar-background); }
-
-                    /* Tabs */
-                    .tabs {
-                        display: flex;
-                        border-bottom: 1px solid var(--vscode-panel-border);
-                        background-color: var(--vscode-sideBar-background);
+                        font-weight: 600;
+                        color: var(--vscode-descriptionForeground);
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
                     }
 
-                    .tab {
-                        padding: 8px 16px;
-                        cursor: pointer;
-                        border-bottom: 2px solid transparent;
-                        opacity: 0.7;
-                    }
-
-                    .tab:hover {
-                        opacity: 1;
-                        background-color: var(--vscode-list-hoverBackground);
-                    }
-
-                    .tab.active {
-                        border-bottom-color: var(--vscode-panelTitle-activeBorder);
-                        opacity: 1;
-                        font-weight: bold;
-                    }
-
-                    /* Tab Content */
-                    .tab-content {
-                        padding: var(--container-padding);
-                        flex-grow: 0;
-                        overflow-y: auto;
-                        display: none;
-                    }
-                    .tab-content.active {
-                        display: block;
-                    }
-
-                    /* Inputs */
                     input, textarea {
-                        width: 100%;
-                        padding: var(--input-padding);
-                        margin-bottom: 10px;
                         background-color: var(--vscode-input-background);
                         border: 1px solid var(--vscode-input-border);
                         color: var(--vscode-input-foreground);
                         border-radius: var(--border-radius);
+                        padding: var(--input-padding);
+                        font-family: 'Consolas', 'Monaco', monospace;
+                        font-size: 13px;
                     }
-                    
-                    label {
-                        display: block;
-                        margin-bottom: 4px;
-                        font-weight: 600;
-                        font-size: 12px;
+
+                    input:focus, textarea:focus {
+                        outline: 1px solid var(--vscode-focusBorder);
+                        border-color: var(--vscode-focusBorder);
+                    }
+
+                    /* Buttons */
+                    .btn-group {
+                        display: flex;
+                        gap: 8px;
                     }
 
                     button {
-                        padding: 6px 12px;
+                        padding: 8px 16px;
                         border: none;
                         border-radius: var(--border-radius);
                         cursor: pointer;
+                        font-weight: 500;
+                        font-size: 12px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 6px;
+                        transition: all 0.2s;
+                    }
+
+                    .btn-primary {
                         background-color: var(--vscode-button-background);
                         color: var(--vscode-button-foreground);
                     }
-                    button:hover {
-                        background-color: var(--vscode-button-hoverBackground);
+                    .btn-primary:hover { background-color: var(--vscode-button-hoverBackground); }
+
+                    .btn-secondary {
+                        background-color: var(--vscode-button-secondaryBackground);
+                        color: var(--vscode-button-secondaryForeground);
                     }
+                    .btn-secondary:hover { background-color: var(--vscode-button-secondaryHoverBackground); }
+
                     button:disabled {
                         opacity: 0.5;
                         cursor: not-allowed;
                     }
+
+                    /* Status Bar */
+                    .status-bar {
+                        padding: 6px 12px;
+                        font-size: 11px;
+                        font-weight: 600;
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                        border-bottom: 1px solid var(--border-color);
+                    }
                     
-                    button.secondary {
-                        background-color: var(--vscode-button-secondaryBackground);
-                        color: var(--vscode-button-secondaryForeground);
+                    .status-dot {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 50%;
+                        background-color: var(--vscode-disabledForeground);
+                    }
+                    
+                    .status-connected .status-dot { background-color: #4CAF50; box-shadow: 0 0 4px #4CAF50; }
+                    .status-disconnected .status-dot { background-color: var(--vscode-errorForeground); }
+                    .status-connecting .status-dot { background-color: var(--vscode-progressBar-background); animation: pulse 1s infinite; }
+
+                    @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+                    /* Tabs */
+                    .tabs {
+                        display: flex;
+                        background-color: var(--bg-secondary);
+                        border-bottom: 1px solid var(--border-color);
+                        padding: 0 16px;
                     }
 
-                    /* Logs Console */
-                    .logs-container {
+                    .tab {
+                        padding: 10px 16px;
+                        cursor: pointer;
+                        font-size: 12px;
+                        color: var(--vscode-foreground);
+                        opacity: 0.7;
+                        border-bottom: 2px solid transparent;
+                        transition: all 0.2s;
+                    }
+
+                    .tab:hover { opacity: 1; background-color: var(--vscode-list-hoverBackground); }
+                    
+                    .tab.active {
+                        opacity: 1;
+                        border-bottom-color: var(--vscode-panelTitle-activeBorder);
+                        color: var(--vscode-panelTitle-activeForeground);
+                    }
+
+                    /* Content Area */
+                    .content {
                         flex-grow: 1;
-                        border-top: 1px solid var(--vscode-panel-border);
+                        overflow: hidden;
                         display: flex;
                         flex-direction: column;
-                        min-height: 150px;
                     }
 
-                    .logs-header {
-                        padding: 4px 10px;
-                        background-color: var(--vscode-panel-background);
-                        border-bottom: 1px solid var(--vscode-panel-border);
-                        font-size: 11px;
-                        font-weight: bold;
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                    }
-
-                    .logs-content {
-                        flex-grow: 1;
+                    .tab-pane {
+                        display: none;
+                        padding: var(--container-padding);
                         overflow-y: auto;
-                        padding: 5px;
-                        font-family: 'Consolas', 'Monaco', monospace;
-                        font-size: 11px;
+                        flex-grow: 1;
+                    }
+                    .tab-pane.active { display: flex; flex-direction: column; gap: 16px; }
+
+                    /* Logs */
+                    .logs-section {
+                        height: 200px;
+                        border-top: 1px solid var(--border-color);
+                        display: flex;
+                        flex-direction: column;
                         background-color: var(--vscode-editor-background);
                     }
 
-                    .log-entry {
-                        margin-bottom: 4px;
-                        padding: 2px 4px;
-                        border-bottom: 1px solid var(--vscode-tree-indentGuidesStroke);
+                    .logs-header {
+                        padding: 8px 16px;
+                        background-color: var(--bg-secondary);
+                        border-bottom: 1px solid var(--border-color);
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        font-size: 11px;
+                        font-weight: 600;
+                        text-transform: uppercase;
                     }
+
+                    .logs-container {
+                        flex-grow: 1;
+                        overflow-y: auto;
+                        padding: 8px;
+                        font-family: 'Consolas', 'Monaco', monospace;
+                        font-size: 12px;
+                    }
+
+                    .log-entry {
+                        padding: 4px 8px;
+                        border-bottom: 1px solid var(--vscode-tree-indentGuidesStroke);
+                        word-break: break-all;
+                    }
+                    .log-time { color: var(--vscode-descriptionForeground); margin-right: 8px; }
                     .log-info { color: var(--vscode-textPreformat-foreground); }
-                    .log-success { color: var(--vscode-testing-iconPassed); }
-                    .log-error { color: var(--vscode-testing-iconFailed); }
-                    .log-warning { color: var(--vscode-testing-iconQueued); }
+                    .log-success { color: #4CAF50; }
+                    .log-error { color: #F44336; }
+                    .log-warning { color: #FFC107; }
 
                 </style>
             </head>
             <body>
                 
-                <!-- Top Bar -->
-                <div class="top-bar">
-                    <div class="url-input-group">
-                        <label>Server URL</label>
-                        <input type="text" id="url" value="${defaultUrl}" placeholder="http://localhost:3000">
-                    </div>
-                    <div class="action-buttons">
-                        <button id="connectBtn">Connect</button>
-                        <button id="disconnectBtn" class="secondary" disabled>Disconnect</button>
+                <div class="header">
+                    <div class="connection-group">
+                        <div class="input-wrapper" style="flex: 3;">
+                            <label>Server URL</label>
+                            <input type="text" id="url" value="${defaultUrl}" placeholder="http://localhost:3000">
+                        </div>
+                        <div class="btn-group">
+                            <button id="connectBtn" class="btn-primary">Connect</button>
+                            <button id="disconnectBtn" class="btn-secondary" disabled>Disconnect</button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Status Bar -->
-                <div class="status-bar ${this._lastStatus.class}" id="status">${
-      this._lastStatus.text
-    }</div>
+                <div class="status-bar status-disconnected" id="statusBar">
+                    <div class="status-dot"></div>
+                    <span id="statusText">Disconnected</span>
+                </div>
 
-                <!-- Tabs -->
                 <div class="tabs">
                     <div class="tab ${
                       activeTab === "emit" ? "active" : ""
-                    }" data-target="emit-tab">Emit</div>
+                    }" data-target="emit">Emit Event</div>
                     <div class="tab ${
                       activeTab === "settings" ? "active" : ""
-                    }" data-target="settings-tab">Settings</div>
+                    }" data-target="settings">Settings</div>
                 </div>
 
-                <!-- Tab Content: Emit -->
-                <div id="emit-tab" class="tab-content ${
-                  activeTab === "emit" ? "active" : ""
-                }">
-                    <label>Event Name</label>
-                    <input type="text" id="eventName" value="${defaultEventName}" placeholder="e.g. message">
-                    
-                    <label>Payload (JSON)</label>
-                    <textarea id="payload" rows="5" placeholder='{"key": "value"}'>${defaultPayload}</textarea>
-                    
-                    <button id="emitBtn" style="width: 100%;" disabled>Send Event</button>
+                <div class="content">
+                    <!-- Emit Tab -->
+                    <div id="emit" class="tab-pane ${
+                      activeTab === "emit" ? "active" : ""
+                    }">
+                        <div class="input-wrapper">
+                            <label>Event Name</label>
+                            <input type="text" id="eventName" value="${defaultEventName}" placeholder="e.g. message">
+                        </div>
+                        
+                        <div class="input-wrapper" style="flex-grow: 1;">
+                            <label>Payload (JSON)</label>
+                            <textarea id="payload" style="flex-grow: 1; resize: none;" placeholder='{"key": "value"}'>${defaultPayload}</textarea>
+                        </div>
+                        
+                        <button id="emitBtn" class="btn-primary" style="width: 100%;" disabled>Send Event</button>
+                    </div>
+
+                    <!-- Settings Tab -->
+                    <div id="settings" class="tab-pane ${
+                      activeTab === "settings" ? "active" : ""
+                    }">
+                        <div class="input-wrapper">
+                            <label>Auth Token (Bearer)</label>
+                            <input type="text" id="token" value="${defaultToken}" placeholder="Optional">
+                        </div>
+                        
+                        <div class="input-wrapper">
+                            <label>User ID (Room)</label>
+                            <input type="text" id="userId" value="${defaultUserId}" placeholder="Optional">
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Tab Content: Settings -->
-                <div id="settings-tab" class="tab-content ${
-                  activeTab === "settings" ? "active" : ""
-                }">
-                    <label>Auth Token (Bearer)</label>
-                    <input type="text" id="token" value="${defaultToken}" placeholder="Optional">
-                    
-                    <label>User ID (Room)</label>
-                    <input type="text" id="userId" value="${defaultUserId}" placeholder="Optional">
-                </div>
-
-                <!-- Logs -->
-                <div class="logs-container">
+                <div class="logs-section">
                     <div class="logs-header">
-                        <span>Console</span>
-                        <button id="clearLogsBtn" style="padding: 2px 6px; font-size: 10px;">Clear</button>
+                        <span>Event Log</span>
+                        <button id="clearLogsBtn" class="btn-secondary" style="padding: 2px 8px; font-size: 10px;">Clear</button>
                     </div>
-                    <div class="logs-content" id="logs">
-                        <!-- Logs will appear here -->
-                    </div>
+                    <div class="logs-container" id="logs"></div>
                 </div>
 
                 <script nonce="${nonce}">
                     const vscode = acquireVsCodeApi();
                     
                     // Elements
-                    const statusDiv = document.getElementById('status');
-                    const connectBtn = document.getElementById('connectBtn');
-                    const disconnectBtn = document.getElementById('disconnectBtn');
-                    const emitBtn = document.getElementById('emitBtn');
-                    const clearLogsBtn = document.getElementById('clearLogsBtn');
-                    const logsDiv = document.getElementById('logs');
-                    
-                    const urlInput = document.getElementById('url');
-                    const tokenInput = document.getElementById('token');
-                    const userIdInput = document.getElementById('userId');
-                    const eventNameInput = document.getElementById('eventName');
-                    const payloadInput = document.getElementById('payload');
-                    
-                    const tabs = document.querySelectorAll('.tab');
-                    const tabContents = document.querySelectorAll('.tab-content');
+                    const els = {
+                        url: document.getElementById('url'),
+                        token: document.getElementById('token'),
+                        userId: document.getElementById('userId'),
+                        eventName: document.getElementById('eventName'),
+                        payload: document.getElementById('payload'),
+                        connectBtn: document.getElementById('connectBtn'),
+                        disconnectBtn: document.getElementById('disconnectBtn'),
+                        emitBtn: document.getElementById('emitBtn'),
+                        clearLogsBtn: document.getElementById('clearLogsBtn'),
+                        logs: document.getElementById('logs'),
+                        statusBar: document.getElementById('statusBar'),
+                        statusText: document.getElementById('statusText'),
+                        tabs: document.querySelectorAll('.tab'),
+                        panes: document.querySelectorAll('.tab-pane')
+                    };
 
                     let currentTab = '${activeTab}';
+
+                    // --- Error Handling ---
+                    window.onerror = function(message, source, lineno, colno, error) {
+                        console.error('Webview Error:', message);
+                        vscode.postMessage({ type: 'log', message: 'Webview Error: ' + message, logType: 'error' });
+                    };
 
                     // --- State Management ---
                     function saveState() {
                         const state = {
-                            url: urlInput.value,
-                            token: tokenInput.value,
-                            userId: userIdInput.value,
-                            eventName: eventNameInput.value,
-                            payload: payloadInput.value,
+                            url: els.url.value,
+                            token: els.token.value,
+                            userId: els.userId.value,
+                            eventName: els.eventName.value,
+                            payload: els.payload.value,
                             activeTab: currentTab
                         };
-                        vscode.postMessage({ type: 'saveState', state: state });
+                        vscode.postMessage({ type: 'saveState', state });
                         vscode.setState(state);
                     }
 
-                    // Attach saveState to inputs
-                    [urlInput, tokenInput, userIdInput, eventNameInput, payloadInput].forEach(el => {
-                        el.onchange = saveState;
+                    ['change', 'input'].forEach(evt => {
+                        [els.url, els.token, els.userId, els.eventName, els.payload].forEach(el => {
+                            el.addEventListener(evt, saveState);
+                        });
                     });
 
-                    // --- Tab Switching ---
-                    tabs.forEach(tab => {
+                    // --- Tabs ---
+                    els.tabs.forEach(tab => {
                         tab.addEventListener('click', () => {
-                            // Remove active class
-                            tabs.forEach(t => t.classList.remove('active'));
-                            tabContents.forEach(c => c.classList.remove('active'));
+                            els.tabs.forEach(t => t.classList.remove('active'));
+                            els.panes.forEach(p => p.classList.remove('active'));
                             
-                            // Add active class
                             tab.classList.add('active');
-                            const targetId = tab.getAttribute('data-target');
-                            document.getElementById(targetId).classList.add('active');
+                            const target = tab.dataset.target;
+                            document.getElementById(target).classList.add('active');
                             
-                            // Update state
-                            currentTab = targetId === 'emit-tab' ? 'emit' : 'settings';
+                            currentTab = target;
                             saveState();
                         });
                     });
 
-                    // --- UI Updates ---
-                    function updateButtons(state) {
-                        const isConnected = state === 'connected';
-                        connectBtn.disabled = isConnected;
-                        disconnectBtn.disabled = !isConnected;
-                        emitBtn.disabled = !isConnected;
-                    }
-
-                    function addLog(message, type) {
-                        const entry = document.createElement('div');
-                        entry.className = 'log-entry log-' + type;
-                        const time = new Date().toLocaleTimeString();
-                        entry.textContent = '[' + time + '] ' + message;
-                        logsDiv.appendChild(entry);
-                        logsDiv.scrollTop = logsDiv.scrollHeight;
-                    }
-
-                    // Initialize
-                    const initialClass = statusDiv.className.split(' ').pop();
-                    updateButtons(initialClass);
-
-                    // --- Event Listeners ---
-                    connectBtn.onclick = () => {
-                        saveState(); 
+                    // --- Actions ---
+                    els.connectBtn.onclick = () => {
+                        saveState();
                         vscode.postMessage({
                             type: 'connect',
-                            url: urlInput.value,
-                            token: tokenInput.value,
-                            userId: userIdInput.value
+                            url: els.url.value,
+                            token: els.token.value,
+                            userId: els.userId.value
                         });
                     };
 
-                    disconnectBtn.onclick = () => {
-                        vscode.postMessage({ type: 'disconnect' });
-                    };
+                    els.disconnectBtn.onclick = () => vscode.postMessage({ type: 'disconnect' });
 
-                    emitBtn.onclick = () => {
+                    els.emitBtn.onclick = () => {
                         saveState();
                         vscode.postMessage({
                             type: 'emit',
-                            eventName: eventNameInput.value,
-                            payload: payloadInput.value
+                            eventName: els.eventName.value,
+                            payload: els.payload.value
                         });
                     };
 
-                    clearLogsBtn.onclick = () => {
-                        logsDiv.innerHTML = '';
+                    els.clearLogsBtn.onclick = () => {
+                        els.logs.innerHTML = '';
                         vscode.postMessage({ type: 'clearLogs' });
                     };
 
-                    // --- Message Handling ---
+                    // --- Updates ---
+                    function updateStatus(text, className) {
+                        els.statusText.textContent = text;
+                        els.statusBar.className = 'status-bar status-' + className;
+                        
+                        const isConnected = className === 'connected';
+                        els.connectBtn.disabled = isConnected;
+                        els.disconnectBtn.disabled = !isConnected;
+                        els.emitBtn.disabled = !isConnected;
+                    }
+
+                    function addLog(msg, type) {
+                        const div = document.createElement('div');
+                        div.className = \`log-entry log-\${type}\`;
+                        const time = new Date().toLocaleTimeString();
+                        div.innerHTML = \`<span class="log-time">[\${time}]\</span>\${msg}\`;
+                        els.logs.appendChild(div);
+                        els.logs.scrollTop = els.logs.scrollHeight;
+                    }
+
+                    // --- Message Handler ---
                     window.addEventListener('message', event => {
-                        const message = event.data;
-                        if (message.type === 'statusUpdate') {
-                            statusDiv.textContent = message.text;
-                            statusDiv.className = 'status-bar ' + message.class;
-                            updateButtons(message.class);
-                        } else if (message.type === 'log') {
-                            addLog(message.message, message.logType);
+                        const msg = event.data;
+                        switch (msg.type) {
+                            case 'statusUpdate':
+                                updateStatus(msg.text, msg.class);
+                                break;
+                            case 'log':
+                                addLog(msg.message, msg.logType);
+                                break;
                         }
                     });
+
+                    // Init
+                    const initialStatusClass = '${this._lastStatus.class}';
+                    updateStatus('${
+                      this._lastStatus.text
+                    }', initialStatusClass);
 
                 </script>
             </body>
