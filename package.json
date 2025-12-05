@@ -173,6 +173,14 @@
         "command": "nest-tools.addLoggerDebug",
         "title": "Add Logger Debug Statement",
         "category": "Debug"
+      },
+      {
+        "command": "nest-tools.openHttpTester",
+        "title": "NestJS: Open HTTP Tester"
+      },
+      {
+        "command": "nest-tools.closeHttpTester",
+        "title": "NestJS: Close HTTP Tester"
       }
     ],
     "menus": {
@@ -184,6 +192,11 @@
         },
         {
           "command": "nest-tools.clearSearchEntities",
+          "when": "view == nest-tools.entityView",
+          "group": "navigation"
+        },
+        {
+          "command": "nest-tools.openHttpTester",
           "when": "view == nest-tools.entityView",
           "group": "navigation"
         }
@@ -242,6 +255,11 @@
       ],
       "editor/context": [
         {
+          "command": "nest-tools.openHttpTester",
+          "when": "resourceLangId == typescript",
+          "group": "navigation"
+        },
+        {
           "command": "nest-tools.completeReturnType",
           "when": "editorTextFocus && editorLangId == typescript",
           "group": "modification"
@@ -271,6 +289,10 @@
         },
         {
           "command": "nest-tools.migrateToTypeOrm"
+        },
+        {
+          "command": "nest-tools.openHttpTester",
+          "when": "true"
         }
       ]
     },
@@ -310,6 +332,7 @@
   },
   "dependencies": {
     "@mermaid-js/mermaid-cli": "^11.12.0",
+    "axios": "^1.13.2",
     "mermaid": "^11.12.1",
     "readline": "^1.3.0",
     "socket.io-client": "^4.8.1",

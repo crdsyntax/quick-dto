@@ -20,6 +20,7 @@ import {
 } from "./views/entity-tree-provider";
 import { EntityVisualizer } from "./views/erd-visualizer";
 import { SocketTesterViewProvider } from "./views/socketView";
+import { closeHttpTesterCommand, openHttpTesterCommand } from "./commands/http-tester.command";
 
 async function addLoggerDebugCommand() {
   const editor = vscode.window.activeTextEditor;
@@ -283,6 +284,14 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "nest-tools.openHttpTester",
+      openHttpTesterCommand
+    ),
+    vscode.commands.registerCommand(
+      "nest-tools.closeHttpTester",
+      closeHttpTesterCommand
+    ),
     vscode.commands.registerCommand(
       "nest-tools.addLoggerDebug",
       addLoggerDebugCommand
