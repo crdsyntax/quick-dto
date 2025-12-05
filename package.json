@@ -168,6 +168,11 @@
         "command": "socketTester.connect",
         "title": "Socket.IO Tester",
         "category": "Development"
+      },
+      {
+        "command": "nest-tools.addLoggerDebug",
+        "title": "Add Logger Debug Statement",
+        "category": "Debug"
       }
     ],
     "menus": {
@@ -239,17 +244,22 @@
         {
           "command": "nest-tools.completeReturnType",
           "when": "editorTextFocus && editorLangId == typescript",
-          "group": "nestjs@1"
+          "group": "modification"
         },
         {
           "command": "nest-tools.controllerByFunction",
           "when": "editorHasSelection && editorLangId == typescript",
-          "group": "nestjs@2"
+          "group": "modification"
         },
         {
           "command": "nest-dto-generator.generateReturnInterface",
           "when": "editorTextFocus && editorLangId == typescript",
-          "group": "nestjs@3"
+          "group": "modification"
+        },
+        {
+          "command": "nest-tools.addLoggerDebug",
+          "when": "editorHasSelection",
+          "group": "modification"
         }
       ],
       "command-palette": [
@@ -268,6 +278,12 @@
       {
         "command": "nest-tools.completeReturnType",
         "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "nest-tools.addLoggerDebug",
+        "key": "ctrl+shift+k",
         "mac": "cmd+shift+t",
         "when": "editorTextFocus"
       },
