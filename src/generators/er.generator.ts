@@ -2,16 +2,25 @@ import { Project } from "ts-morph";
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
+import {
+  EntityData,
+  EntityField,
+  EntityRelation,
+  ErdDiagramData,
+} from "../types/erd-types";
 
 function logStep(msg: string) {
   process.stdout.write(`\n[WORKFLOW] ${msg}...\n`);
 }
 
-export async function generateMermaidString(
+/**
+ * Generate structured ERD data from TypeORM entities
+ */
+export async function generateErdData(
   rootPath: string,
   rootEntityName: string,
   depth = 2
-): Promise<string> {
+): Promise<ErdDiagramData> {
   const ENTITIES_PATH = rootPath + "/src/**/*.entity.ts";
 
   const project = new Project({
@@ -19,25 +28,32 @@ export async function generateMermaidString(
   });
   const sourceFiles = project.addSourceFilesAtPaths(ENTITIES_PATH);
 
-  const entities: Record<string, { columns: string[]; relations: string[] }> =
-    {};
+  const entities: Record<string, EntityData> = {};
 
+  // Parse all entities
   for (const file of sourceFiles) {
     const classes = file.getClasses();
     for (const cls of classes) {
       const name = cls.getName();
       if (!name) continue;
 
-      entities[name] = { columns: [], relations: [] };
+      const entityData: EntityData = {
+        name,
+        fields: [],
+        relations: [],
+      };
 
       const props = cls.getProperties();
       for (const prop of props) {
         const decorators = prop.getDecorators().map((d) => d.getName());
+        const propName = prop.getName();
+        const propType = prop
+          .getType()
+          .getText()
+          .replace(/\[\]$/, "")
+          .replace(/Promise<(.+)>/, "$1");
 
-        if (decorators.includes("Column")) {
-          entities[name].columns.push(prop.getName());
-        }
-
+        // Check if it's a relation
         const relDecor = prop
           .getDecorators()
           .find((d) =>
@@ -47,6 +63,7 @@ export async function generateMermaidString(
           );
 
         if (relDecor) {
+          // It's a relation
           let relTypeName = "";
           const arg = relDecor.getArguments()[0];
 
@@ -57,26 +74,52 @@ export async function generateMermaidString(
           }
 
           if (!relTypeName) {
-            relTypeName = prop
-              .getType()
-              .getText()
-              .replace(/\[\]$/, "")
-              .replace(/Promise<(.+)>/, "$1");
+            relTypeName = propType;
           }
 
           if (relTypeName && relTypeName !== name) {
-            entities[name].relations.push(relTypeName);
+            entityData.relations.push({
+              type: relDecor.getName() as any,
+              targetEntity: relTypeName,
+              propertyName: propName,
+            });
           }
+        } else {
+          // It's a regular field - include ALL properties
+          const isPrimary = decorators.some(
+            (d) => d === "PrimaryGeneratedColumn" || d === "PrimaryColumn"
+          );
+
+          const isNullable =
+            prop.hasQuestionToken() ||
+            (decorators.some((d) => d === "Column") &&
+              prop.getDecorators().some((d) => {
+                const args = d.getArguments();
+                return args.some((arg) =>
+                  arg.getText().includes("nullable: true")
+                );
+              }));
+
+          entityData.fields.push({
+            name: propName,
+            type: propType,
+            isPrimary,
+            isNullable,
+            decorators,
+          });
         }
       }
+
+      entities[name] = entityData;
     }
   }
 
+  // Build subgraph starting from root entity
   const visited = new Set<string>();
   const queue: Array<{ name: string; level: number }> = [
     { name: rootEntityName, level: 0 },
   ];
-  const subEntities: Record<string, (typeof entities)[string]> = {};
+  const subEntities: Record<string, EntityData> = {};
 
   while (queue.length > 0) {
     const { name, level } = queue.shift()!;
@@ -88,27 +131,88 @@ export async function generateMermaidString(
     subEntities[name] = entities[name];
 
     for (const rel of entities[name].relations) {
-      if (entities[rel]) queue.push({ name: rel, level: level + 1 });
+      if (entities[rel.targetEntity]) {
+        queue.push({ name: rel.targetEntity, level: level + 1 });
+      }
     }
   }
 
+  return {
+    entities: subEntities,
+    rootEntity: rootEntityName,
+  };
+}
+
+/**
+ * Generate Mermaid string from ERD data (for backward compatibility)
+ */
+export async function generateMermaidString(
+  rootPath: string,
+  rootEntityName: string,
+  depth = 2
+): Promise<string> {
+  const erdData = await generateErdData(rootPath, rootEntityName, depth);
+  const { entities } = erdData;
+
   let mermaid = "classDiagram\n";
 
-  if (Object.keys(subEntities).length === 0) {
-    mermaid += "class Dummy { id int }\n";
+  if (Object.keys(entities).length === 0) {
+    // Show the root entity even if it has no relations
+    mermaid += `class ${rootEntityName} {\n`;
+    mermaid += "  No fields detected\n";
+    mermaid += "}\n";
+    return mermaid.trim();
   }
 
-  for (const [entity, data] of Object.entries(subEntities)) {
-    mermaid += `class ${entity} {\n`;
-    data.columns.forEach((c) => (mermaid += `  + ${c}\n`));
+  // Generate class definitions
+  for (const [entityName, data] of Object.entries(entities)) {
+    mermaid += `class ${entityName} {\n`;
+
+    if (data.fields.length === 0) {
+      mermaid += "  (no fields)\n";
+    } else {
+      data.fields.forEach((field) => {
+        const prefix = field.isPrimary ? "🔑 " : "+ ";
+        const nullable = field.isNullable ? "?" : "";
+        mermaid += `  ${prefix}${field.name}${nullable} : ${field.type}\n`;
+      });
+    }
+
     mermaid += "}\n\n";
   }
 
-  const rootEntity = subEntities[rootEntityName];
-  if (rootEntity) {
-    rootEntity.relations.forEach((target) => {
-      if (subEntities[target]) {
-        mermaid += ` ${rootEntityName} --> ${target}\n`;
+  // Generate ALL relationships (not just from root)
+  const addedRelations = new Set<string>();
+
+  for (const [entityName, data] of Object.entries(entities)) {
+    data.relations.forEach((rel) => {
+      if (entities[rel.targetEntity]) {
+        // Create unique key to avoid duplicate relations
+        const relKey = `${entityName}-${rel.targetEntity}-${rel.propertyName}`;
+        const reverseKey = `${rel.targetEntity}-${entityName}-${rel.propertyName}`;
+
+        if (!addedRelations.has(relKey) && !addedRelations.has(reverseKey)) {
+          addedRelations.add(relKey);
+
+          // Use different arrow styles based on relation type
+          let arrow = "-->";
+          switch (rel.type) {
+            case "OneToMany":
+              arrow = "-->";
+              break;
+            case "ManyToOne":
+              arrow = "-->";
+              break;
+            case "OneToOne":
+              arrow = "-->";
+              break;
+            case "ManyToMany":
+              arrow = "-->";
+              break;
+          }
+
+          mermaid += `${entityName} ${arrow} ${rel.targetEntity} : ${rel.type}\n`;
+        }
       }
     });
   }

@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as fs from "fs";
 import { generateDtoCommand } from "./commands/dto.command";
 import { generateInterfaceCommand } from "./commands/interface.command";
 import { generateReturnInterfaceCommand } from "./commands/return-interface.command";
@@ -101,13 +102,29 @@ export function activate(context: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand(
       "nest-tools.viewEntityErd",
-      (item: EntityItem) => {
-        if (item && item.label) {
-          EntityVisualizer.createOrShow(
-            context.extensionUri,
-            item.label,
-            vscode.workspace.rootPath || ""
-          );
+      async (item: EntityItem) => {
+        if (item && item.label && item.filePath) {
+          try {
+            const content = fs.readFileSync(item.filePath, "utf8");
+
+            const match = content.match(/export\s+class\s+(\w+)/);
+            if (!match) {
+              vscode.window.showWarningMessage(
+                "No se pudo detectar la clase en el archivo."
+              );
+              return;
+            }
+            const entityClassName = match[1];
+
+            EntityVisualizer.createOrShow(
+              context.extensionUri,
+              entityClassName,
+              vscode.workspace.rootPath || "",
+              context
+            );
+          } catch (err: any) {
+            vscode.window.showErrorMessage(`Error opening ERD: ${err.message}`);
+          }
         }
       }
     ),
