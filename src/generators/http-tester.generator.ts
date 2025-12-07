@@ -21,11 +21,173 @@ export interface HttpResponse {
   time: number;
   size: number;
 }
+export interface HttpCollection {
+  name: string;
+  type: "http" | "socket";
+  url: string;
+  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS";
+  body: string; // JSON string
+  queryParams: { key: string; value: string }[];
+  headers: { key: string; value: string }[];
+  authType: "none" | "bearer" | "basic";
+  authToken: string;
+  basicUsername: string;
+  basicPassword: string;
+}
 
+// Mocks de DTOs (simulación de la lectura de DTOs)
+const mockDtos: Record<string, any> = {
+  CreateNotificationDto: {
+    recipientId: "user-uuid-12345",
+    message: "This is a sample notification message.",
+    type: "alert",
+    isRead: false,
+  },
+  UpdateNotificationDto: {
+    isRead: true,
+    message: "Optional new message",
+  },
+};
+
+function getDefaultValue(typeName: string): any {
+  const type = typeName.toLowerCase();
+  if (type.includes("string")) return "example string";
+  if (type.includes("number") || type.includes("bigint")) return 123;
+  if (type.includes("boolean")) return true;
+  if (type.includes("date")) return "2025-12-07T05:00:00Z";
+  // Manejo básico de arreglos y objetos
+  if (type.includes("array") || type.includes("[]")) return [];
+  if (type.includes("object") || type.includes("record")) return {};
+  return null;
+}
+
+function parseDtoProperties(dtoContent: string): Record<string, any> {
+  const body: Record<string, any> = {};
+
+  // Regex: Busca (propiedad) opcional (?) o requerida, seguida de dos puntos (:) y el (tipo)
+  // Captura: (propiedad) [?] : (tipo) [[]?];
+  const propertyRegex = /(\w+)\??:\s*(\w+)(?:\[\])?\s*;/g;
+
+  let match;
+  while ((match = propertyRegex.exec(dtoContent)) !== null) {
+    const [, propertyName, propertyType] = match;
+
+    let finalType = propertyType;
+
+    // Asignación de valor: se prefiere el valor basado en la decoración de Class Validator si está presente
+    // Se busca en el texto inmediatamente anterior a la declaración de la propiedad.
+    const prevCode = dtoContent.substring(
+      Math.max(0, match.index - 200),
+      match.index
+    );
+
+    if (prevCode.includes("@IsBoolean()")) {
+      finalType = "boolean";
+    } else if (prevCode.includes("@IsString()")) {
+      finalType = "string";
+    } else if (prevCode.includes("@IsNumber()")) {
+      finalType = "number";
+    } else if (prevCode.includes("@IsDate()")) {
+      finalType = "date";
+    }
+
+    // Solo incluimos la propiedad si tiene un tipo inferible.
+    if (finalType !== propertyType) {
+      body[propertyName] = getDefaultValue(finalType);
+    } else {
+      // Si no se pudo inferir por decorador, usamos el tipo de TypeScript.
+      body[propertyName] = getDefaultValue(propertyType);
+    }
+  }
+
+  return body;
+}
 export class HttpTesterGenerator {
   private static instance: HttpTesterGenerator;
 
   private constructor() {}
+
+
+  public static generateCollectionsFromController(
+    controllerCode: string,
+    baseUrl: string,
+    dtoContents: Record<string, string> // Aceptar contenido de DTOs
+  ): HttpCollection[] {
+    const collections: HttpCollection[] = [];
+
+    const controllerMatch = controllerCode.match(
+      /@Controller\((?:'|")([^'"]+)(?:'|")\)/
+    );
+    const basePath = controllerMatch ? controllerMatch[1] : "default";
+
+    const endpointRegex =
+      /@(Get|Post|Patch|Put|Delete|Options|Head)\((?:'|")?([^'"]*)?(?:'|")?\)\s*\n\s*@ApiOperation\({ summary: "([^"]+)" }\)\s*\n(?:.|\n)*?\s*(?:async)?\s*(\w+)\s*\(([^)]*)\)/g;
+
+    let match;
+    while ((match = endpointRegex.exec(controllerCode)) !== null) {
+      const [
+        ,
+        httpMethodDecorator,
+        pathSegment,
+        summary,
+        functionName,
+        paramsString,
+      ] = match;
+
+      const httpMethod =
+        httpMethodDecorator.toUpperCase() as HttpCollection["method"];
+      let fullPath = `/${basePath}/${pathSegment || ""}`
+        .replace(/\/+/g, "/")
+        .replace(/\/$/, "");
+
+      const bodyMatch = paramsString.match(/@Body\s*\(\)\s*(\w+)/);
+      const paramMatch = paramsString.match(/@Param\("([^"]+)"\)\s*(\w+)/);
+
+      const bodyDtoName = bodyMatch ? bodyMatch[1] : null;
+      let bodyContent = "";
+
+      if (bodyDtoName && dtoContents[bodyDtoName]) {
+        const parsedBody = parseDtoProperties(dtoContents[bodyDtoName]);
+        bodyContent = JSON.stringify(parsedBody, null, 2);
+      } else if (
+        httpMethod !== "GET" &&
+        httpMethod !== "HEAD" &&
+        httpMethod !== "OPTIONS"
+      ) {
+        bodyContent = "{}";
+      }
+
+      const queryParams: { key: string; value: string }[] = [];
+
+      if (paramMatch) {
+        const paramName = paramMatch[1];
+        if (pathSegment && pathSegment.includes(`:${paramName}`)) {
+          fullPath = fullPath.replace(`:${paramName}`, `example-${paramName}`);
+        }
+      }
+
+      const collection: HttpCollection = {
+        name: `${basePath.toUpperCase()}: ${summary || functionName}`,
+        type: "http",
+        url: `${baseUrl}${fullPath}`,
+        method: httpMethod,
+        body: ["POST", "PUT", "PATCH"].includes(httpMethod) ? bodyContent : "",
+        queryParams: queryParams,
+        headers: [
+          { key: "Content-Type", value: "application/json" },
+          { key: "Accept", value: "application/json" },
+        ],
+        authType: "bearer",
+        authToken: "{{YOUR_AUTH_TOKEN}}",
+        basicUsername: "",
+        basicPassword: "",
+      };
+
+      collections.push(collection);
+    }
+
+    return collections;
+  }
 
   public static getInstance(): HttpTesterGenerator {
     if (!HttpTesterGenerator.instance) {
@@ -34,7 +196,6 @@ export class HttpTesterGenerator {
     return HttpTesterGenerator.instance;
   }
 
-  // Clase faltante: wrapper uniforme para el panel
   public async execute(request: HttpRequest): Promise<HttpResponse> {
     return await this.sendRequest(request);
   }

@@ -24,6 +24,7 @@ import {
   closeHttpTesterCommand,
   openHttpTesterCommand,
 } from "./commands/http-tester.command";
+import { generateCollectionsFromControllerCommand } from "./commands/generate-collection.command";
 
 async function addLoggerDebugCommand() {
   const editor = vscode.window.activeTextEditor;
@@ -287,6 +288,10 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "nest-tools.generateHttpCollections",
+      (fileUri: vscode.Uri) => generateCollectionsFromControllerCommand(context, fileUri)
+    ),
     vscode.commands.registerCommand("nest-tools.openHttpTester", () =>
       openHttpTesterCommand(context)
     ),

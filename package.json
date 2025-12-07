@@ -181,6 +181,10 @@
       {
         "command": "nest-tools.closeHttpTester",
         "title": "NestJS: Close HTTP Tester"
+      },
+      {
+        "command": "nest-tools.generateHttpCollections",
+        "title": "NestJS Tools: Generar Colecciones HTTP (Controller)"
       }
     ],
     "menus": {
@@ -202,6 +206,11 @@
         }
       ],
       "explorer/context": [
+        {
+          "command": "nest-tools.generateHttpCollections",
+          "group": "nest-tools@1",
+          "when": "resourceExtname == .ts && resourceFilename =~ /controller\\.ts$/"
+        },
         {
           "command": "nest-dto-generator.generateDto",
           "when": "resourceFilename =~ /\\.entity|schema\\.ts$/",
@@ -254,6 +263,11 @@
         }
       ],
       "editor/context": [
+        {
+          "command": "nest-tools.generateHttpCollections",
+          "group": "nest-tools@1",
+          "when": "resourceExtname == .ts && resourceFilename =~ /controller\\.ts$/"
+        },
         {
           "command": "nest-tools.openHttpTester",
           "when": "resourceLangId == typescript",
