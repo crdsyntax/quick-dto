@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Tester</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Oxygen, Ubuntu, sans-serif;
+        padding: 24px;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        color: #e2e8f0;
+        min-height: 100vh;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 32px;
+      }
+
+      .header h1 {
+        font-size: 32px;
+        font-weight: 700;
+        background: linear-gradient(90deg, #60a5fa 0%, #38bdf8 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        margin-bottom: 8px;
+      }
+
+      .header p {
+        color: #94a3b8;
+        font-size: 14px;
+      }
+
+      /* --- NUEVOS ESTILOS DE LAYOUT (SIDEBAR) --- */
+      .main-wrapper {
+        display: flex;
+        gap: 30px;
+      }
+      
+      .collections-sidebar {
+        width: 300px; /* Ancho fijo para el sidebar */
+        flex-shrink: 0;
+        padding: 15px;
+        border-radius: 6px;
+        background-color: #1e293b; 
+        border: 1px solid #334155;
+        /* Calcular altura para evitar overflow si el contenido es grande */
+        height: calc(100vh - 80px); 
+        overflow-y: auto;
+      }
+      
+      .main-content {
+        flex-grow: 1;
+        max-width: calc(100% - 330px); /* Ajustar el espacio restante */
+      }
+      
+      .collection-controls h3 {
+        color: #60a5fa; 
+        margin-bottom: 15px;
+        font-size: 16px;
+        font-weight: 600;
+        border-bottom: 1px solid #334155;
+        padding-bottom: 5px;
+      }
+      
+      .collection-item-group {
+        display: flex; 
+        gap: 10px; 
+        margin-bottom: 15px;
+      }
+      
+      /* Ocultar los títulos y separadores de colección viejos */
+      #http-tab > h2:nth-of-type(1),
+      #http-tab > hr:nth-of-type(1),
+      #socket-tab > h2:nth-of-type(2),
+      #socket-tab > hr:nth-of-type(2) {
+          display: none;
+      }
+
+
+      .input-group {
+        margin-bottom: 15px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+        color: #94a3b8;
+        font-size: 14px;
+      }
+
+      input[type="text"],
+      textarea,
+      select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #334155;
+        background-color: #0f172a; /* Ligeramente más oscuro en inputs */
+        color: #e2e8f0;
+        border-radius: 6px;
+        transition: border-color 0.2s;
+        font-size: 14px;
+      }
+      
+      /* Ajuste de color de input para el sidebar */
+      .collections-sidebar input[type="text"],
+      .collections-sidebar select {
+          background-color: #0f172a;
+      }
+
+      input[type="text"]:focus,
+      textarea:focus,
+      select:focus {
+        border-color: #38bdf8;
+        outline: none;
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 100px;
+      }
+
+      .request-line {
+        display: grid;
+        grid-template-columns: 100px 1fr 150px;
+        gap: 15px;
+        margin-bottom: 20px;
+        align-items: center;
+      }
+
+      .action-button {
+        padding: 10px 15px;
+        background-color: #38bdf8;
+        color: #0f172a;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: background-color 0.2s;
+        height: 42px;
+      }
+
+      .action-button:hover {
+        background-color: #0ea5e9;
+      }
+
+      .action-button:disabled {
+        background-color: #64748b;
+        cursor: not-allowed;
+      }
+
+      /* Parámetros y Headers */
+      .params-container,
+      .headers-container {
+        margin-top: 10px;
+        border: 1px solid #334155;
+        border-radius: 6px;
+        padding: 10px;
+      }
+
+      .param-row,
+      .header-row {
+        display: grid;
+        grid-template-columns: 40% 40% auto;
+        gap: 10px;
+        margin-bottom: 8px;
+        align-items: center;
+      }
+
+      .remove-button {
+        background: none;
+        border: none;
+        color: #ef4444;
+        cursor: pointer;
+        font-size: 18px;
+        height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .tab-auth-header {
+        display: flex;
+        margin-bottom: 15px;
+      }
+
+      .auth-tab-button {
+        padding: 8px 12px;
+        cursor: pointer;
+        background: #1e293b;
+        border: 1px solid #334155;
+        color: #94a3b8;
+        border-radius: 6px 6px 0 0;
+        margin-right: 5px;
+        transition: all 0.2s;
+      }
+
+      .auth-tab-button.active {
+        background: #334155;
+        color: #e2e8f0;
+      }
+
+      .auth-content {
+        border: 1px solid #334155;
+        padding: 15px;
+        border-radius: 0 6px 6px 6px;
+        margin-top: -1px;
+      }
+
+      .auth-content:not(.active) {
+        display: none;
+      }
+      
+      /* Response */
+      .response-container {
+        margin-top: 30px;
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 6px;
+      }
+
+      .response-header {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 15px;
+        border-bottom: 1px solid #334155;
+        font-size: 14px;
+        color: #94a3b8;
+      }
+
+      .response-content {
+        padding: 15px;
+      }
+
+      .response-data {
+        background-color: #0f172a;
+        padding: 15px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .status-2xx {
+        color: #10b981;
+      }
+      .status-3xx {
+        color: #f59e0b;
+      }
+      .status-4xx,
+      .status-5xx {
+        color: #ef4444;
+      }
+
+      .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        display: none;
+      }
+
+      .loading-overlay.active {
+        display: flex;
+      }
+
+      .spinner {
+        border: 4px solid rgba(255, 255, 255, 0.1);
+        border-top: 4px solid #38bdf8;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* --- ESTILOS DE TABS Y SOCKET --- */
+
+      .tab-header {
+        display: flex;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #334155;
+      }
+
+      .tab-button {
+        padding: 10px 15px;
+        cursor: pointer;
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        font-size: 16px;
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s;
+      }
+
+      .tab-button.active {
+        color: #38bdf8;
+        border-bottom: 3px solid #38bdf8;
+      }
+
+      .tab-content {
+        display: none;
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      .socket-controls {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        align-items: center;
+      }
+
+      .status-indicator {
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-weight: bold;
+        color: #0f172a;
+        font-size: 14px;
+      }
+
+      .status-indicator.connected {
+        background-color: #10b981; /* Green */
+      }
+      .status-indicator.connecting {
+        background-color: #f59e0b; /* Yellow */
+      }
+      .status-indicator.disconnected {
+        background-color: #ef4444; /* Red */
+      }
+
+      .log-container {
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        padding: 10px;
+        height: 300px;
+        overflow-y: scroll;
+        margin-top: 15px;
+        border-radius: 4px;
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+
+      .log-entry {
+        border-bottom: 1px dotted #334155;
+        padding: 3px 0;
+      }
+
+      .log-entry:last-child {
+        border-bottom: none;
+      }
+
+      .log-entry.log-event {
+        color: #38bdf8; /* Blue for events */
+      }
+
+      .log-entry.log-error {
+        color: #ef4444; /* Red for errors */
+        font-weight: bold;
+      }
+
+      .log-time {
+        color: #64748b;
+        margin-right: 5px;
+      }
+
+      .socket-payload-group {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 20px;
+        align-items: end;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>API Tester</h1>
+        <p>Prueba peticiones HTTP y eventos Socket.IO</p>
+      </div>
+
+      <div class="main-wrapper">
+        
+        <div id="collections-sidebar" class="collections-sidebar">
+            <h2 style="margin-bottom: 20px; font-size: 24px; color: #38bdf8;">Colecciones</h2>
+            
+            <div id="http-collection-controls" class="collection-controls">
+                <h3>HTTP Requests</h3>
+                <div class="collection-item-group">
+                    <div style="flex-grow: 1;">
+                        <label for="http-collection-name">Nombre de Colección</label>
+                        <input type="text" id="http-collection-name" placeholder="Nuevo Nombre">
+                    </div>
+                    <button id="http-save-collection-button" class="action-button" style="align-self: flex-end; width: 100px;">Guardar</button>
+                </div>
+
+                <div class="collection-item-group">
+                    <div style="flex-grow: 1;">
+                        <label for="http-collection-select">Seleccionar</label>
+                        <select id="http-collection-select">
+                            <option value="">-- Selecciona una Colección --</option>
+                        </select>
+                    </div>
+                    <button id="http-load-collection-button" class="action-button" style="align-self: flex-end; width: 80px;" disabled>Cargar</button>
+                    <button id="http-delete-collection-button" class="action-button" style="align-self: flex-end; width: 80px; background-color: #ef4444;" disabled>Eliminar</button>
+                </div>
+                <hr style="margin: 20px 0; border-color: #334155;">
+            </div>
+
+            <div id="socket-collection-controls" class="collection-controls" style="display: none;">
+                <h3>Socket.IO Events</h3>
+                <div class="collection-item-group">
+                    <div style="flex-grow: 1;">
+                        <label for="socket-collection-name">Nombre de Colección</label>
+                        <input type="text" id="socket-collection-name" placeholder="Nuevo Nombre">
+                    </div>
+                    <button id="socket-save-collection-button" class="action-button" style="align-self: flex-end; width: 100px;">Guardar</button>
+                </div>
+
+                <div class="collection-item-group">
+                    <div style="flex-grow: 1;">
+                        <label for="socket-collection-select">Seleccionar</label>
+                        <select id="socket-collection-select">
+                            <option value="">-- Selecciona una Colección --</option>
+                        </select>
+                    </div>
+                    <button id="socket-load-collection-button" class="action-button" style="align-self: flex-end; width: 80px;" disabled>Cargar</button>
+                    <button id="socket-delete-collection-button" class="action-button" style="align-self: flex-end; width: 80px; background-color: #ef4444;" disabled>Eliminar</button>
+                </div>
+                <hr style="margin: 20px 0; border-color: #334155;">
+            </div>
+
+        </div>
+
+        <div class="main-content">
+            
+            <div class="tab-header">
+                <button class="tab-button active" data-tab="http">HTTP Tester</button>
+                <button class="tab-button" data-tab="socket">Socket.IO Tester</button>
+            </div>
+
+            <div id="http-tab" class="tab-content active">
+                
+                <div class="request-line">
+                    <select id="method-select">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="PATCH">PATCH</option>
+                        <option value="HEAD">HEAD</option>
+                        <option value="OPTIONS">OPTIONS</option>
+                    </select>
+                    <input type="text" id="url-input" placeholder="Enter URL" />
+                    <button id="send-button" class="action-button">Send Request</button>
+                </div>
+
+                <div class="tab-auth-header http-tabs"> 
+                    <button class="auth-tab-button active" data-auth="body">Body</button>
+                    <button class="auth-tab-button" data-auth="params">Query Params</button>
+                    <button class="auth-tab-button" data-auth="headers">Headers</button>
+                    <button class="auth-tab-button" data-auth="auth">Auth</button>
+                </div>
+
+                <div id="body-content" class="auth-content active">
+                    <textarea id="body-textarea" placeholder="Request Body (JSON, XML, etc.)"></textarea>
+                </div>
+
+                <div id="params-content" class="auth-content">
+                    <label>Query Parameters</label>
+                    <div id="params-container" class="params-container">
+                        </div>
+                    <button id="add-param-button" class="action-button" style="margin-top: 10px;">
+                        + Add Param
+                    </button>
+                </div>
+
+                <div id="headers-content" class="auth-content">
+                    <label>Headers</label>
+                    <div id="headers-container" class="headers-container">
+                        </div>
+                    <button id="add-header-button" class="action-button" style="margin-top: 10px;">
+                        + Add Header
+                    </button>
+                </div>
+
+                <div id="auth-content" class="auth-content">
+                    <div class="tab-auth-header">
+                        <button class="auth-tab-button active" data-auth-type="none">None</button>
+                        <button class="auth-tab-button" data-auth-type="bearer">Bearer Token</button>
+                        <button class="auth-tab-button" data-auth-type="basic">Basic Auth</button>
+                    </div>
+
+                    <div id="auth-none" class="auth-content active">
+                        <p>No authentication will be used.</p>
+                    </div>
+
+                    <div id="auth-bearer" class="auth-content">
+                        <label for="bearer-token">Token</label>
+                        <input type="text" id="bearer-token" placeholder="Enter Bearer Token" />
+                    </div>
+
+                    <div id="auth-basic" class="auth-content">
+                        <div class="input-group">
+                            <label for="basic-username">Username</label>
+                            <input type="text" id="basic-username" placeholder="Enter Username" />
+                        </div>
+                        <div class="input-group">
+                            <label for="basic-password">Password</label>
+                            <input type="password" id="basic-password" placeholder="Enter Password" />
+                        </div>
+                    </div>
+                </div>
+
+                <div id="response-container" class="response-container" style="display:none;">
+                    <div id="response-header" class="response-header">
+                        </div>
+                    <div id="response-content" class="response-content">
+                        <pre id="response-data" class="response-data"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div id="socket-tab" class="tab-content">
+                <h2>Socket.IO Connection</h2>
+                
+                <div class="socket-controls">
+                    <input type="text" id="socket-url-input" placeholder="Socket URL (e.g., http://localhost:3000)">
+                    <button id="socket-connect-button" class="action-button">Connect</button>
+                    <button id="socket-disconnect-button" class="action-button" style="display:none;">Disconnect</button>
+                    <span id="socket-status" class="status-indicator disconnected">Disconnected</span>
+                </div>
+
+                <div class="input-group">
+                    <label for="socket-token-input">Auth Token (Bearer)</label>
+                    <input type="text" id="socket-token-input" placeholder="Optional Auth Token">
+                </div>
+                
+                <div class="input-group">
+                    <label for="socket-user-id">User ID (for 'join' room)</label>
+                    <input type="text" id="socket-user-id" placeholder="Optional User ID">
+                </div>
+
+                <hr style="margin: 20px 0; border-color: #334155;">
+                
+                <h2>Emit Event</h2>
+                
+                <div class="socket-payload-group">
+                    <div class="input-group">
+                        <label for="socket-event-name">Event Name</label>
+                        <input type="text" id="socket-event-name" value="message" placeholder="e.g., newMessage">
+                    </div>
+                    <div class="input-group" style="padding-top: 15px;">
+                        <button id="socket-emit-button" class="action-button" disabled>Emit Event</button>
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <label for="socket-payload-textarea">Payload (JSON)</label>
+                    <textarea id="socket-payload-textarea" rows="8">{}</textarea>
+                </div>
+
+                <hr style="margin: 20px 0; border-color: #334155;">
+
+                <h2>Socket Log</h2>
+                <div id="socket-log-container" class="log-container">
+                    </div>
+            </div>
+        </div>
+
+      </div>
+      </div>
+
+    <div id="loading-overlay" class="loading-overlay">
+      <div class="spinner"></div>
+    </div>
+
+    <script>
+      // @ts-nocheck
+      const vscode = acquireVsCodeApi();
+
+      // --- HTML ELEMENTS (HTTP) ---
+      const urlInput = document.getElementById("url-input");
+      const methodSelect = document.getElementById("method-select");
+      const bodyTextarea = document.getElementById("body-textarea");
+      const sendButton = document.getElementById("send-button");
+      const loadingDiv = document.getElementById("loading-overlay");
+      const responseContainer = document.getElementById("response-container");
+      const responseHeader = document.getElementById("response-header");
+      const responseData = document.getElementById("response-data");
+      const paramsContainer = document.getElementById("params-container");
+      const addParamButton = document.getElementById("add-param-button");
+      const headersContainer = document.getElementById("headers-container");
+      const addHeaderButton = document.getElementById("add-header-button");
+      
+      const httpContentTabs = document.querySelectorAll('.http-tabs button');
+      const httpContentAreas = document.querySelectorAll('#http-tab > .auth-content');
+      
+      let currentAuthType = "none";
+
+      // --- HTML ELEMENTS (SOCKET) ---
+      const socketUrlInput = document.getElementById("socket-url-input");
+      const socketTokenInput = document.getElementById("socket-token-input");
+      const socketUserIdInput = document.getElementById("socket-user-id");
+      const socketConnectButton = document.getElementById(
+        "socket-connect-button"
+      );
+      const socketDisconnectButton = document.getElementById(
+        "socket-disconnect-button"
+      );
+      const socketStatusSpan = document.getElementById("socket-status");
+      const socketEventNameInput = document.getElementById(
+        "socket-event-name"
+      );
+      const socketPayloadTextarea = document.getElementById(
+        "socket-payload-textarea"
+      );
+      const socketEmitButton = document.getElementById("socket-emit-button");
+      const socketLogContainer = document.getElementById(
+        "socket-log-container"
+      );
+      let socketState = {};
+      
+      // --- ELEMENTOS COLECCIONES HTTP (MOVIDOS AL SIDEBAR) ---
+      const httpCollectionControls = document.getElementById('http-collection-controls');
+      const httpCollectionNameInput = document.getElementById('http-collection-name');
+      const httpCollectionSelect = document.getElementById('http-collection-select');
+      const httpSaveCollectionButton = document.getElementById('http-save-collection-button');
+      const httpLoadCollectionButton = document.getElementById('http-load-collection-button');
+      const httpDeleteCollectionButton = document.getElementById('http-delete-collection-button');
+
+      // --- ELEMENTOS COLECCIONES SOCKET (MOVIDOS AL SIDEBAR) ---
+      const socketCollectionControls = document.getElementById('socket-collection-controls');
+      const socketCollectionNameInput = document.getElementById('socket-collection-name');
+      const socketCollectionSelect = document.getElementById('socket-collection-select');
+      const socketSaveCollectionButton = document.getElementById('socket-save-collection-button');
+      const socketLoadCollectionButton = document.getElementById('socket-load-collection-button');
+      const socketDeleteCollectionButton = document.getElementById('socket-delete-collection-button');
+      
+      // --- Global Collections State ---
+      let currentTab = 'http'; // Estado inicial
+      let collections = []; // Array unificado para colecciones de ambos tipos
+
+      // --- GENERAL FUNCTIONS (HTTP) ---
+      
+      /**
+       * Crea y agrega una fila de entrada (Key/Value) al contenedor.
+       * Se utiliza para Query Params y Headers.
+       */
+      function addRow(container, type, key = '', value = '') {
+          const row = document.createElement("div");
+          row.className = `${type}-row`;
+          
+          // Reemplazar comillas dobles para evitar problemas de inyección en el atributo value
+          const sanitizedKey = key.replace(/"/g, '&quot;');
+          const sanitizedValue = value.replace(/"/g, '&quot;');
+
+          row.innerHTML = `
+            <input type="text" class="${type}-key" placeholder="${type} Key" value="${sanitizedKey}" />
+            <input type="text" class="${type}-value" placeholder="${type} Value" value="${sanitizedValue}" />
+            <button class="remove-button" onclick="this.parentNode.remove(); saveGlobalState();">
+              &times;
+            </button>
+          `;
+          
+          // Listeners para persistencia: cualquier cambio en una fila de Key/Value debe guardar el estado.
+          row.querySelector(`.${type}-key`).addEventListener('input', saveGlobalState);
+          row.querySelector(`.${type}-value`).addEventListener('input', saveGlobalState);
+
+          container.appendChild(row);
+      }
+
+      function collectQueryParams() {
+        const params = [];
+        paramsContainer
+          .querySelectorAll(".param-row")
+          .forEach((row) => {
+            const key = row.querySelector(".param-key").value.trim();
+            const value = row.querySelector(".param-value").value.trim();
+            // Solo guardamos si hay una clave
+            if (key) {
+              params.push({ key: key, value: value });
+            }
+          });
+        return params;
+      }
+
+      function collectHeaders() {
+        const headers = [];
+        headersContainer
+          .querySelectorAll(".header-row")
+          .forEach((row) => {
+            const key = row.querySelector(".header-key").value.trim();
+            const value = row.querySelector(".header-value").value.trim();
+            if (key) {
+              headers.push({ key: key, value: value });
+            }
+          });
+        return headers;
+      }
+      
+      // Event Listeners para agregar fila (incluyendo llamada a saveGlobalState)
+      addParamButton.addEventListener("click", () => {
+        addRow(paramsContainer, "param");
+        saveGlobalState();
+      });
+      addHeaderButton.addEventListener("click", () => {
+        addRow(headersContainer, "header");
+        saveGlobalState();
+      });
+
+      function addParamRow() {
+        if (paramsContainer.children.length === 0) {
+          addRow(paramsContainer, "param");
+        }
+      }
+      
+      httpContentTabs.forEach(button => {
+        button.addEventListener('click', (e) => {
+            const target = e.target.getAttribute('data-auth');
+            httpContentTabs.forEach(btn => btn.classList.remove('active'));
+            e.target.classList.add('active');
+            httpContentAreas.forEach(content => {
+                if (content.id === `${target}-content`) {
+                    content.classList.add('active');
+                } else {
+                    content.classList.remove('active');
+                }
+            });
+        });
+      });
+
+
+      function switchAuthTab(type) {
+        currentAuthType = type;
+        document
+          .querySelectorAll('#auth-content .tab-auth-header button[data-auth-type]')
+          .forEach((btn) => btn.classList.remove("active"));
+        document
+          .querySelector(
+            `#auth-content .tab-auth-header button[data-auth-type="${type}"]`
+          )
+          .classList.add("active");
+
+        document.querySelectorAll("#auth-content > .auth-content").forEach((div) => {
+            div.classList.remove("active");
+        });
+        document.getElementById(`auth-${type}`).classList.add("active");
+        saveGlobalState(); 
+      }
+
+      document
+        .querySelectorAll('#auth-content .tab-auth-header button[data-auth-type]')
+        .forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            const type = e.target.getAttribute("data-auth-type");
+            switchAuthTab(type);
+          });
+        });
+
+      function parseBody(body) {
+        if (!body || body.trim() === "") {
+            return null;
+        }
+        try {
+            return JSON.parse(body);
+        } catch (e) {
+            return body;
+        }
+      }
+      
+      function sendRequest() {
+        const request = {
+          url: urlInput.value.trim(),
+          method: methodSelect.value,
+          headers: collectHeaders().reduce((acc, item) => { acc[item.key] = item.value; return acc; }, {}), // Convertir a objeto para el backend
+          queryParams: collectQueryParams().reduce((acc, item) => { acc[item.key] = item.value; return acc; }, {}), // Convertir a objeto para el backend
+          body: parseBody(bodyTextarea.value),
+          authType: currentAuthType,
+          authToken: document.getElementById('bearer-token').value,
+          basicUsername: document.getElementById('basic-username').value,
+          basicPassword: document.getElementById('basic-password').value 
+        };
+
+        if (!request.url) {
+          showError("Please enter a URL");
+          return;
+        }
+
+        loadingDiv.classList.add("active");
+        responseContainer.style.display = "none";
+
+        vscode.postMessage({
+          command: "sendRequest",
+          request: request,
+        });
+        
+        // El envío de la petición también debe guardar el estado actual
+        saveGlobalState();
+      }
+
+      sendButton.addEventListener("click", sendRequest);
+
+      function formatResponseData(data) {
+          if (typeof data === 'object' && data !== null) {
+              try {
+                  return JSON.stringify(data, null, 2);
+              } catch (e) {
+                  return String(data);
+              }
+          }
+          return String(data);
+      }
+
+      function displayResponse(response) {
+        responseContainer.style.display = "block";
+        const statusClass =
+          response.status >= 200 && response.status < 300
+            ? "status-2xx"
+            : response.status >= 300 && response.status < 400
+            ? "status-3xx"
+            : "status-4xx";
+
+        responseHeader.innerHTML = `
+          <span class="${statusClass}">${response.status} ${
+          response.statusText
+        }</span>
+          <span>Time: ${response.time}ms | Size: ${formatBytes(
+          response.size
+        )}</span>
+        `;
+        responseData.textContent = formatResponseData(response.data);
+      }
+
+      function showError(message) {
+        responseContainer.style.display = "block";
+        responseHeader.innerHTML = `<span class="status-4xx">Error</span>`;
+        responseData.textContent = message;
+      }
+
+      function stopLoading() {
+        loadingDiv.classList.remove("active");
+      }
+
+      function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return "0 Bytes";
+        const k = 1024;
+        const sizes = ["B", "KB", "MB", "GB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return (
+          parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) +
+          " " +
+          sizes[i]
+        );
+      }
+      
+      /**
+       * Recrea las filas de Key/Value en el contenedor (Params o Headers)
+       * a partir de un array de objetos {key: string, value: string}.
+       */
+      function loadKeyValuesToContainer(container, keyValues, type) {
+          // Limpiar el contenido existente
+          container.innerHTML = ''; 
+          
+          if (keyValues && keyValues.length > 0) {
+              keyValues.forEach(item => {
+                  addRow(container, type, item.key || '', item.value || '');
+              });
+          } 
+          
+          // Si es el contenedor de params y está vacío, añadir una fila por defecto
+          if (type === 'param' && container.children.length === 0) {
+              addRow(container, type);
+          }
+      }
+
+
+      // --- UNIFIED STATE AND COLLECTIONS LOGIC ---
+
+      /**
+       * Captura el estado actual del formulario de la pestaña activa.
+       * IMPORTANTE: Ahora incluye queryParams y headers como arrays de {key, value}.
+       * @param {'http'|'socket'} type 
+       */
+      function getCurrentFormState(type) {
+          if (type === 'http') {
+              return {
+                  type: 'http',
+                  url: urlInput.value.trim(),
+                  method: methodSelect.value,
+                  body: bodyTextarea.value, 
+                  queryParams: collectQueryParams(), // Incluye Params
+                  headers: collectHeaders(), // Incluye Headers
+                  authType: currentAuthType,
+                  authToken: document.getElementById('bearer-token').value,
+                  basicUsername: document.getElementById('basic-username').value,
+                  basicPassword: document.getElementById('basic-password').value
+              };
+          } else if (type === 'socket') {
+              return {
+                  type: 'socket',
+                  url: socketUrlInput.value,
+                  token: socketTokenInput.value,
+                  userId: socketUserIdInput.value,
+                  eventName: socketEventNameInput.value,
+                  payload: socketPayloadTextarea.value,
+              };
+          }
+          return {};
+      }
+
+      /**
+       * Aplica los valores de una colección al formulario correspondiente.
+       * @param {object} collection 
+       */
+      function applyCollectionToForm(collection) {
+          if (collection.type === 'http') {
+              urlInput.value = collection.url || '';
+              methodSelect.value = collection.method || 'GET';
+              bodyTextarea.value = collection.body || '';
+              
+              // NEW: Cargar Params y Headers
+              loadKeyValuesToContainer(paramsContainer, collection.queryParams || [], 'param');
+              loadKeyValuesToContainer(headersContainer, collection.headers || [], 'header');
+              
+              // Auth
+              switchAuthTab(collection.authType || 'none');
+              document.getElementById('bearer-token').value = collection.authToken || '';
+              document.getElementById('basic-username').value = collection.basicUsername || '';
+              document.getElementById('basic-password').value = collection.basicPassword || '';
+              
+              saveGlobalState(); // Guardar el nuevo estado cargado
+              
+          } else if (collection.type === 'socket') {
+              socketUrlInput.value = collection.url || '';
+              socketTokenInput.value = collection.token || '';
+              socketUserIdInput.value = collection.userId || '';
+              socketEventNameInput.value = collection.eventName || 'message';
+              socketPayloadTextarea.value = collection.payload || '{}';
+              
+              // Sincronizar con el estado de la extensión si es necesario para conexión
+              saveSocketState(); 
+          }
+      }
+
+      /**
+       * Actualiza la lista desplegable de colecciones para la pestaña activa.
+       */
+      function updateCollectionSelect() {
+          const selector = currentTab === 'http' ? httpCollectionSelect : socketCollectionSelect;
+          const currentTabCollections = collections.filter(c => c.type === currentTab);
+          
+          selector.innerHTML = '<option value="">-- Selecciona una Colección --</option>';
+          currentTabCollections.forEach(col => {
+              const option = document.createElement('option');
+              option.value = col.name;
+              option.textContent = col.name;
+              selector.appendChild(option);
+          });
+          
+          // Deshabilitar/Habilitar botones de Cargar/Eliminar
+          const loadButton = currentTab === 'http' ? httpLoadCollectionButton : socketLoadCollectionButton;
+          const deleteButton = currentTab === 'http' ? httpDeleteCollectionButton : socketDeleteCollectionButton;
+
+          const hasSelection = selector.value !== "";
+          loadButton.disabled = !hasSelection;
+          deleteButton.disabled = !hasSelection;
+          
+          // Escuchar el evento 'change' en el select para actualizar la disponibilidad de los botones
+          selector.onchange = () => {
+             const selected = selector.value !== "";
+             loadButton.disabled = !selected;
+             deleteButton.disabled = !selected;
+          };
+      }
+
+      function handleSaveCollection() {
+          const nameInput = currentTab === 'http' ? httpCollectionNameInput : socketCollectionNameInput;
+          const name = nameInput.value.trim();
+          
+          if (!name) {
+              alert(`Por favor, introduce un nombre para la colección de ${currentTab.toUpperCase()}.`);
+              return;
+          }
+          
+          const newCollection = {
+              name: name,
+              ...getCurrentFormState(currentTab)
+          };
+          
+          // Reemplazar si existe (mismo nombre y mismo tipo) o agregar nuevo
+          const existingIndex = collections.findIndex(c => c.name === name && c.type === currentTab);
+          if (existingIndex !== -1) {
+              collections[existingIndex] = newCollection;
+              alert(`Colección '${name}' (${currentTab.toUpperCase()}) actualizada.`);
+          } else {
+              collections.push(newCollection);
+              alert(`Colección '${name}' (${currentTab.toUpperCase()}) guardada.`);
+          }
+          
+          updateCollectionSelect();
+          saveGlobalState(); // Guardar el array de colecciones actualizado
+          nameInput.value = ''; 
+      }
+
+      function handleLoadCollection() {
+          const select = currentTab === 'http' ? httpCollectionSelect : socketCollectionSelect;
+          const name = select.value;
+          const collection = collections.find(c => c.name === name && c.type === currentTab);
+          
+          if (collection) {
+              applyCollectionToForm(collection);
+              alert(`Colección '${name}' (${currentTab.toUpperCase()}) cargada.`);
+          }
+      }
+
+      function handleDeleteCollection() {
+          const select = currentTab === 'http' ? httpCollectionSelect : socketCollectionSelect;
+          const name = select.value;
+          
+          if (confirm(`¿Estás seguro de que deseas eliminar la colección '${name}' (${currentTab.toUpperCase()})?`)) {
+              collections = collections.filter(c => !(c.name === name && c.type === currentTab));
+              updateCollectionSelect();
+              saveGlobalState();
+              alert(`Colección '${name}' (${currentTab.toUpperCase()}) eliminada.`);
+          }
+      }
+
+      /**
+       * Guarda el estado de la extensión, incluyendo las colecciones y el estado de HTTP actual.
+       * Esta función se llama en cualquier cambio de input relevante para asegurar la persistencia.
+       */
+      function saveGlobalState() {
+          const httpState = getCurrentFormState('http');
+          
+          vscode.setState({
+              // HTTP State (Guardar el último estado en inputs - Persistencia del endpoint consultado)
+              url: httpState.url,
+              method: httpState.method,
+              body: httpState.body,
+              queryParams: httpState.queryParams, // NEW
+              headers: httpState.headers, // NEW
+              authType: httpState.authType,
+              authToken: httpState.authToken,
+              basicUsername: httpState.basicUsername,
+              basicPassword: httpState.basicPassword,
+              // Global State
+              collections: collections, 
+          });
+      }
+
+      // --- Inicialización y Carga de Estado ---
+      
+      const savedState = vscode.getState();
+      if (savedState) {
+          // 1. Load HTTP State (Último Endpoint Consultado)
+          urlInput.value = savedState.url || "";
+          methodSelect.value = savedState.method || "GET";
+          bodyTextarea.value = savedState.body || "";
+          
+          // NEW: Cargar Headers y Params
+          loadKeyValuesToContainer(paramsContainer, savedState.queryParams, 'param');
+          loadKeyValuesToContainer(headersContainer, savedState.headers, 'header');
+
+          if (savedState.authType) {
+              switchAuthTab(savedState.authType);
+              document.getElementById("bearer-token").value = savedState.authToken || "";
+              document.getElementById("basic-username").value = savedState.basicUsername || "";
+              document.getElementById("basic-password").value = savedState.basicPassword || "";
+          }
+          
+          // 2. Load Collections State
+          collections = savedState.collections || [];
+          
+          // 3. Initialize collection select for the default HTTP tab
+          updateCollectionSelect(); 
+      } else {
+           // Inicializar con una fila de params si no hay estado guardado
+           addParamRow(); 
+      }
+
+      // Save HTTP state on general inputs changes
+      [urlInput, methodSelect, bodyTextarea, document.getElementById('bearer-token'), document.getElementById('basic-username'), document.getElementById('basic-password')].forEach(
+          (element) => {
+            element.addEventListener("input", saveGlobalState);
+          }
+      );
+
+      // --- Event Listeners for Collections ---
+
+      // HTTP Listeners
+      httpSaveCollectionButton.addEventListener('click', handleSaveCollection);
+      httpLoadCollectionButton.addEventListener('click', handleLoadCollection);
+      httpDeleteCollectionButton.addEventListener('click', handleDeleteCollection);
+      // El 'change' se maneja ahora en updateCollectionSelect para los botones de Load/Delete
+      
+      // SOCKET Listeners
+      socketSaveCollectionButton.addEventListener('click', handleSaveCollection);
+      socketLoadCollectionButton.addEventListener('click', handleLoadCollection);
+      socketDeleteCollectionButton.addEventListener('click', handleDeleteCollection);
+      // El 'change' se maneja ahora en updateCollectionSelect para los botones de Load/Delete
+
+
+      // --- SOCKET.IO IMPLEMENTATION (JS) ---
+
+      function saveSocketState() {
+        socketState = getCurrentFormState('socket'); // Usar la función unificada
+        vscode.postMessage({
+            command: 'socketStateUpdate',
+            data: socketState,
+        });
+      }
+
+      // Event Listeners para Socket
+      [socketUrlInput, socketTokenInput, socketUserIdInput, socketEventNameInput, socketPayloadTextarea].forEach(element => {
+          element.addEventListener('input', saveSocketState);
+      });
+
+      socketConnectButton.addEventListener('click', () => {
+          saveSocketState();
+          vscode.postMessage({ command: 'socketConnect', data: socketState });
+      });
+
+      socketDisconnectButton.addEventListener('click', () => {
+          vscode.postMessage({ command: 'socketDisconnect' });
+      });
+
+      socketEmitButton.addEventListener('click', () => {
+          saveSocketState();
+          const data = {
+              eventName: socketEventNameInput.value,
+              payload: socketPayloadTextarea.value,
+          };
+          vscode.postMessage({ command: 'socketEmit', data: data });
+      });
+
+      function updateSocketUI(isConnected) {
+          if (isConnected) {
+              socketConnectButton.style.display = 'none';
+              socketDisconnectButton.style.display = 'inline-block';
+              socketEmitButton.disabled = false;
+              socketUrlInput.disabled = true;
+              socketTokenInput.disabled = true;
+              socketUserIdInput.disabled = true;
+          } else {
+              socketConnectButton.style.display = 'inline-block';
+              socketDisconnectButton.style.display = 'none';
+              socketEmitButton.disabled = true;
+              socketUrlInput.disabled = false;
+              socketTokenInput.disabled = false;
+              socketUserIdInput.disabled = false;
+          }
+      }
+
+      function updateSocketStatus(text, className) {
+          socketStatusSpan.textContent = text;
+          socketStatusSpan.className = `status-indicator ${className}`;
+          const isConnected = className === 'connected';
+          updateSocketUI(isConnected);
+      }
+
+      function addSocketLog(message, type) {
+          const div = document.createElement('div');
+          div.className = `log-entry log-${type}`;
+          const time = new Date().toLocaleTimeString();
+          div.innerHTML = `<span class="log-time">[${time}]</span>${message.replace(/\n/g, '<br>')}`;
+          socketLogContainer.appendChild(div);
+          socketLogContainer.scrollTop = socketLogContainer.scrollHeight;
+      }
+
+      // --- TAB LOGIC (HTTP/SOCKET) ---
+      const tabButtons = document.querySelectorAll('.tab-button');
+      const tabContents = document.querySelectorAll('.tab-content');
+
+      tabButtons.forEach(button => {
+          button.addEventListener('click', () => {
+              const targetTab = button.getAttribute('data-tab');
+              
+              // Switch buttons
+              tabButtons.forEach(btn => btn.classList.remove('active'));
+              button.classList.add('active');
+              
+              // Switch content
+              tabContents.forEach(content => {
+                  if (content.id === `${targetTab}-tab`) {
+                      content.classList.add('active');
+                  } else {
+                      content.classList.remove('active');
+                  }
+              });
+              
+              // Gestionar la visibilidad de los controles de colección en el sidebar
+              httpCollectionControls.style.display = targetTab === 'http' ? 'block' : 'none';
+              socketCollectionControls.style.display = targetTab === 'socket' ? 'block' : 'none';
+              
+              currentTab = targetTab;
+              updateCollectionSelect(); // Refresca la lista de colecciones
+
+              if (targetTab === 'socket') {
+                  vscode.postMessage({ command: 'socketGetInitialState' });
+              }
+          });
+      });
+
+
+      // --- Manejo de mensajes del Webview (añadir casos de Socket) ---
+
+      window.addEventListener('message', event => {
+          const message = event.data;
+          
+          switch (message.command) {
+              case 'response': // HTTP Response
+                  stopLoading();
+                  displayResponse(message.response);
+                  break;
+              case 'error': // HTTP Error
+                  stopLoading();
+                  showError(message.message);
+                  break;
+                  
+              case 'socketLog': // Logs del socket
+                  addSocketLog(message.message, message.type);
+                  break;
+              case 'socketStatus': // Estado del socket
+                  updateSocketStatus(message.status, message.className);
+                  break;
+              case 'socketInitialState': // Cargar estado al abrir pestaña
+                  // Note: The socket inputs are updated when a collection is loaded
+                  // but here we ensure the last non-collection state is used if no collection is loaded.
+                  socketState = message.state;
+                  socketUrlInput.value = socketState.url || '';
+                  socketTokenInput.value = socketState.token || '';
+                  socketUserIdInput.value = socketState.userId || '';
+                  socketEventNameInput.value = socketState.eventName || 'message';
+                  socketPayloadTextarea.value = socketState.payload || '{}';
+                  
+                  updateSocketStatus(message.status.text, message.status.class);
+                  break;
+          }
+      });
+    </script>
+  </body>
+</html>
