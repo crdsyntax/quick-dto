@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HTTP Tester - Sidebar</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--vscode-font-family);
+        color: var(--vscode-foreground);
+        background-color: var(--vscode-sideBar-background);
+        padding: 12px;
+      }
+
+      .header {
+        margin-bottom: 16px;
+      }
+
+      .header h2 {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--vscode-foreground);
+        margin-bottom: 8px;
+      }
+
+      .button {
+        width: 100%;
+        padding: 8px 12px;
+        background-color: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+        border: none;
+        border-radius: 2px;
+        cursor: pointer;
+        font-size: 13px;
+        margin-bottom: 8px;
+        text-align: left;
+      }
+
+      .button:hover {
+        background-color: var(--vscode-button-hoverBackground);
+      }
+
+      .button.primary {
+        background-color: var(--vscode-button-background);
+      }
+
+      .button.secondary {
+        background-color: var(--vscode-button-secondaryBackground);
+        color: var(--vscode-button-secondaryForeground);
+      }
+
+      .section {
+        margin-bottom: 20px;
+      }
+
+      .section-title {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--vscode-descriptionForeground);
+        margin-bottom: 8px;
+      }
+
+      .collection-list {
+        list-style: none;
+      }
+
+      .collection-item {
+        padding: 6px 8px;
+        margin-bottom: 4px;
+        background-color: var(--vscode-list-inactiveSelectionBackground);
+        border-radius: 2px;
+        cursor: pointer;
+        font-size: 13px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .collection-item:hover {
+        background-color: var(--vscode-list-hoverBackground);
+      }
+
+      .collection-name {
+        flex-grow: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .collection-method {
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 2px;
+        margin-left: 8px;
+        font-weight: 600;
+      }
+
+      .method-GET {
+        background-color: #61affe;
+        color: #fff;
+      }
+
+      .method-POST {
+        background-color: #49cc90;
+        color: #fff;
+      }
+
+      .method-PUT {
+        background-color: #fca130;
+        color: #fff;
+      }
+
+      .method-DELETE {
+        background-color: #f93e3e;
+        color: #fff;
+      }
+
+      .method-PATCH {
+        background-color: #50e3c2;
+        color: #fff;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 20px;
+        color: var(--vscode-descriptionForeground);
+        font-size: 12px;
+      }
+
+      .import-button {
+        background-color: #10b981;
+        color: white;
+      }
+
+      .import-button:hover {
+        background-color: #059669;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h2>HTTP Tester</h2>
+      <button class="button primary" id="open-editor-button">
+        ✨ Abrir en Editor
+      </button>
+      <button class="button import-button" id="import-json-button">
+        📥 Importar JSON
+      </button>
+      <button class="button secondary" id="export-json-button">
+        📤 Exportar JSON
+      </button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Colecciones HTTP</div>
+      <ul class="collection-list" id="http-collections">
+        <li class="empty-state">No hay colecciones guardadas</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Colecciones Socket</div>
+      <ul class="collection-list" id="socket-collections">
+        <li class="empty-state">No hay colecciones guardadas</li>
+      </ul>
+    </div>
+
+    <script>
+      const vscode = acquireVsCodeApi();
+
+      const openEditorButton = document.getElementById("open-editor-button");
+      const importJsonButton = document.getElementById("import-json-button");
+      const exportJsonButton = document.getElementById("export-json-button");
+      const httpCollectionsList = document.getElementById("http-collections");
+      const socketCollectionsList = document.getElementById("socket-collections");
+
+      let collections = [];
+      let currentTab = "http";
+
+      // Open editor button
+      openEditorButton.addEventListener("click", () => {
+        vscode.postMessage({
+          command: "openInEditor",
+          collection: null
+        });
+      });
+
+      // Import JSON button
+      importJsonButton.addEventListener("click", () => {
+        vscode.postMessage({
+          command: "importJson",
+          type: currentTab
+        });
+      });
+
+      // Export JSON button
+      exportJsonButton.addEventListener("click", () => {
+        if (collections.length === 0) {
+          alert("No hay colecciones para exportar");
+          return;
+        }
+        vscode.postMessage({
+          command: "exportJson",
+          collections: collections
+        });
+      });
+
+      // Render collections
+      function renderCollections() {
+        const httpCollections = collections.filter(c => c.type === "http");
+        const socketCollections = collections.filter(c => c.type === "socket");
+
+        // Render HTTP collections
+        if (httpCollections.length === 0) {
+          httpCollectionsList.innerHTML = '<li class="empty-state">No hay colecciones guardadas</li>';
+        } else {
+          httpCollectionsList.innerHTML = httpCollections.map(col => `
+            <li class="collection-item" data-name="${col.name}" data-type="http">
+              <span class="collection-name">${col.name}</span>
+              <span class="collection-method method-${col.method}">${col.method}</span>
+            </li>
+          `).join('');
+        }
+
+        // Render Socket collections
+        if (socketCollections.length === 0) {
+          socketCollectionsList.innerHTML = '<li class="empty-state">No hay colecciones guardadas</li>';
+        } else {
+          socketCollectionsList.innerHTML = socketCollections.map(col => `
+            <li class="collection-item" data-name="${col.name}" data-type="socket">
+              <span class="collection-name">${col.name}</span>
+            </li>
+          `).join('');
+        }
+
+        // Add click listeners
+        document.querySelectorAll('.collection-item').forEach(item => {
+          item.addEventListener('click', () => {
+            const name = item.getAttribute('data-name');
+            const type = item.getAttribute('data-type');
+            const collection = collections.find(c => c.name === name && c.type === type);
+            
+            if (collection) {
+              vscode.postMessage({
+                command: "openInEditor",
+                collection: collection
+              });
+            }
+          });
+        });
+      }
+
+      // Handle messages from extension
+      window.addEventListener("message", (event) => {
+        const message = event.data;
+
+        switch (message.command) {
+          case "loadCollections":
+            if (message.collections && Array.isArray(message.collections)) {
+              collections = message.collections;
+              renderCollections();
+            }
+            break;
+          case "importedCollections":
+            if (message.collections && Array.isArray(message.collections)) {
+              // Add imported collections
+              message.collections.forEach(importedCol => {
+                const exists = collections.find(
+                  c => c.name === importedCol.name && c.type === importedCol.type
+                );
+                if (!exists) {
+                  collections.push(importedCol);
+                }
+              });
+              renderCollections();
+            }
+            break;
+        }
+      });
+
+      // Initial render
+      renderCollections();
+    </script>
+  </body>
+</html>

@@ -464,6 +464,22 @@
                 Eliminar
               </button>
             </div>
+            <div class="collection-item-group">
+              <button
+                id="http-import-json-button"
+                class="action-button"
+                style="width: 48%; background-color: #10b981"
+              >
+                📥 Importar JSON
+              </button>
+              <button
+                id="http-export-json-button"
+                class="action-button"
+                style="width: 48%; background-color: #3b82f6"
+              >
+                📤 Exportar JSON
+              </button>
+            </div>
             <hr style="margin: 20px 0; border-color: #334155" />
           </div>
 
@@ -519,6 +535,22 @@
                 Eliminar
               </button>
             </div>
+            <div class="collection-item-group">
+              <button
+                id="socket-import-json-button"
+                class="action-button"
+                style="width: 48%; background-color: #10b981"
+              >
+                📥 Importar JSON
+              </button>
+              <button
+                id="socket-export-json-button"
+                class="action-button"
+                style="width: 48%; background-color: #3b82f6"
+              >
+                📤 Exportar JSON
+              </button>
+            </div>
             <hr style="margin: 20px 0; border-color: #334155" />
           </div>
         </div>
@@ -550,6 +582,24 @@
               </button>
             </div>
 
+            <!-- Repeat Request Controls -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 150px; gap: 15px; margin-bottom: 20px; align-items: end;">
+              <div class="input-group" style="margin-bottom: 0;">
+                <label for="repeat-count">Repeat Count</label>
+                <input type="number" id="repeat-count" min="1" max="1000" value="1" placeholder="1" />
+              </div>
+              <div class="input-group" style="margin-bottom: 0;">
+                <label for="content-type-select">Content Type</label>
+                <select id="content-type-select">
+                  <option value="json">JSON</option>
+                  <option value="formdata">FormData</option>
+                </select>
+              </div>
+              <button id="repeat-button" class="action-button" style="background-color: #8b5cf6;">
+                Repeat Request
+              </button>
+            </div>
+
             <div class="tab-auth-header http-tabs">
               <button class="auth-tab-button active" data-auth="body">
                 Body
@@ -559,6 +609,9 @@
               </button>
               <button class="auth-tab-button" data-auth="headers">
                 Headers
+              </button>
+              <button class="auth-tab-button" data-auth="files">
+                Files
               </button>
               <button class="auth-tab-button" data-auth="auth">Auth</button>
             </div>
@@ -591,6 +644,20 @@
                 style="margin-top: 10px"
               >
                 + Add Header
+              </button>
+            </div>
+
+            <div id="files-content" class="auth-content">
+              <label>Files (FormData)</label>
+              <div id="files-container" class="params-container">
+                <!-- File rows will be added here -->
+              </div>
+              <button
+                id="add-file-button"
+                class="action-button"
+                style="margin-top: 10px"
+              >
+                + Add File
               </button>
             </div>
 
@@ -750,6 +817,11 @@
       const addParamButton = document.getElementById("add-param-button");
       const headersContainer = document.getElementById("headers-container");
       const addHeaderButton = document.getElementById("add-header-button");
+      const filesContainer = document.getElementById("files-container");
+      const addFileButton = document.getElementById("add-file-button");
+      const repeatButton = document.getElementById("repeat-button");
+      const repeatCountInput = document.getElementById("repeat-count");
+      const contentTypeSelect = document.getElementById("content-type-select");
 
       const httpContentTabs = document.querySelectorAll(".http-tabs button");
       const httpContentAreas = document.querySelectorAll(
@@ -881,6 +953,58 @@
         return headers;
       }
 
+      // --- FILE UPLOAD FUNCTIONS ---
+      
+      function addFileRow(fieldName = "", fileName = "", fileData = "") {
+        const row = document.createElement("div");
+        row.className = "param-row";
+        
+        row.innerHTML = `
+          <input type="text" class="file-field-name" placeholder="Field Name" value="${fieldName}" />
+          <input type="file" class="file-input" style="font-size: 12px;" />
+          <button class="remove-button" onclick="this.parentNode.remove();">
+            &times;
+          </button>
+        `;
+        
+        // Store file data when selected
+        const fileInput = row.querySelector(".file-input");
+        fileInput.addEventListener("change", async (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              // Store base64 data in a data attribute
+              const base64 = event.target.result.split(",")[1];
+              fileInput.dataset.fileData = base64;
+              fileInput.dataset.fileName = file.name;
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+        
+        filesContainer.appendChild(row);
+      }
+
+      function collectFiles() {
+        const files = [];
+        filesContainer.querySelectorAll(".param-row").forEach((row) => {
+          const fieldName = row.querySelector(".file-field-name").value.trim();
+          const fileInput = row.querySelector(".file-input");
+          const fileData = fileInput.dataset.fileData;
+          const fileName = fileInput.dataset.fileName;
+          
+          if (fieldName && fileData) {
+            files.push({ 
+              fieldName: fieldName, 
+              fileName: fileName,
+              fileData: fileData 
+            });
+          }
+        });
+        return files;
+      }
+
       // Event Listeners para agregar fila (incluyendo llamada a saveGlobalState)
       addParamButton.addEventListener("click", () => {
         addRow(paramsContainer, "param");
@@ -889,6 +1013,10 @@
       addHeaderButton.addEventListener("click", () => {
         addRow(headersContainer, "header");
         saveGlobalState();
+      });
+
+      addFileButton.addEventListener("click", () => {
+        addFileRow();
       });
 
       function addParamRow() {
@@ -957,6 +1085,9 @@
       }
 
       function sendRequest() {
+        const contentType = contentTypeSelect.value;
+        const files = collectFiles();
+        
         const request = {
           url: urlInput.value.trim(),
           method: methodSelect.value,
@@ -965,7 +1096,15 @@
             return acc;
           }, {}), // Convertir a objeto para el backend
           queryParams: collectQueryParams().reduce((acc, item) => {
-            acc[item.key] = item.value;
+            if (acc[item.key]) {
+              if (Array.isArray(acc[item.key])) {
+                acc[item.key].push(item.value);
+              } else {
+                acc[item.key] = [acc[item.key], item.value];
+              }
+            } else {
+              acc[item.key] = item.value;
+            }
             return acc;
           }, {}), // Convertir a objeto para el backend
           body: parseBody(bodyTextarea.value),
@@ -973,6 +1112,8 @@
           authToken: document.getElementById("bearer-token").value,
           basicUsername: document.getElementById("basic-username").value,
           basicPassword: document.getElementById("basic-password").value,
+          contentType: contentType,
+          files: files
         };
 
         if (!request.url) {
@@ -993,6 +1134,59 @@
       }
 
       sendButton.addEventListener("click", sendRequest);
+
+      repeatButton.addEventListener("click", () => {
+        const repeatCount = parseInt(repeatCountInput.value) || 1;
+        const contentType = contentTypeSelect.value;
+        const files = collectFiles();
+        
+        if (repeatCount < 1 || repeatCount > 1000) {
+          alert("Repeat count must be between 1 and 1000");
+          return;
+        }
+        
+        const request = {
+          url: urlInput.value.trim(),
+          method: methodSelect.value,
+          headers: collectHeaders().reduce((acc, item) => {
+            acc[item.key] = item.value;
+            return acc;
+          }, {}),
+          queryParams: collectQueryParams().reduce((acc, item) => {
+            if (acc[item.key]) {
+              if (Array.isArray(acc[item.key])) {
+                acc[item.key].push(item.value);
+              } else {
+                acc[item.key] = [acc[item.key], item.value];
+              }
+            } else {
+              acc[item.key] = item.value;
+            }
+            return acc;
+          }, {}),
+          body: parseBody(bodyTextarea.value),
+          authType: currentAuthType,
+          authToken: document.getElementById("bearer-token").value,
+          basicUsername: document.getElementById("basic-username").value,
+          basicPassword: document.getElementById("basic-password").value,
+          contentType: contentType,
+          files: files
+        };
+
+        if (!request.url) {
+          showError("Please enter a URL");
+          return;
+        }
+
+        loadingDiv.classList.add("active");
+        responseContainer.style.display = "none";
+
+        vscode.postMessage({
+          command: "repeatRequest",
+          request: request,
+          repeatCount: repeatCount
+        });
+      });
 
       function formatResponseData(data) {
         if (typeof data === "object" && data !== null) {
@@ -1264,6 +1458,7 @@
       function saveGlobalState() {
         const httpState = getCurrentFormState("http");
 
+        // Save to webview state for quick restore
         vscode.setState({
           // HTTP State (Guardar el último estado en inputs - Persistencia del endpoint consultado)
           url: httpState.url,
@@ -1276,6 +1471,12 @@
           basicUsername: httpState.basicUsername,
           basicPassword: httpState.basicPassword,
           // Global State
+          collections: collections,
+        });
+
+        // Send collections to backend for persistent storage
+        vscode.postMessage({
+          command: "saveCollections",
           collections: collections,
         });
       }
@@ -1358,6 +1559,34 @@
         handleDeleteCollection
       );
       // El 'change' se maneja ahora en updateCollectionSelect para los botones de Load/Delete
+
+      // Import JSON Listeners
+      const httpImportJsonButton = document.getElementById("http-import-json-button");
+      const socketImportJsonButton = document.getElementById("socket-import-json-button");
+      const httpExportJsonButton = document.getElementById("http-export-json-button");
+      const socketExportJsonButton = document.getElementById("socket-export-json-button");
+
+      function handleImportJson() {
+        // Request file from VS Code
+        vscode.postMessage({
+          command: "importJson",
+          type: currentTab
+        });
+      }
+
+      function handleExportJson() {
+        // Send collections to VS Code for export
+        vscode.postMessage({
+          command: "exportJson",
+          type: currentTab,
+          collections: collections
+        });
+      }
+
+      httpImportJsonButton.addEventListener("click", handleImportJson);
+      socketImportJsonButton.addEventListener("click", handleImportJson);
+      httpExportJsonButton.addEventListener("click", handleExportJson);
+      socketExportJsonButton.addEventListener("click", handleExportJson);
 
       // --- SOCKET.IO IMPLEMENTATION (JS) ---
 
@@ -1485,6 +1714,28 @@
             stopLoading();
             showError(message.message);
             break;
+          case "repeatProgress": // Repeat request progress
+            // Update response with current iteration
+            displayResponse(message.response);
+            responseHeader.innerHTML += ` <span style="color: #8b5cf6;">[${message.current}/${message.total}]</span>`;
+            break;
+          case "repeatComplete": // Repeat request complete
+            stopLoading();
+            const successCount = message.results.filter(r => r.success).length;
+            const failCount = message.results.filter(r => !r.success).length;
+            
+            // Show summary
+            const summaryHtml = `
+              <div style="padding: 15px; background: #1e293b; border-radius: 6px; margin-top: 15px;">
+                <h3 style="color: #38bdf8; margin-bottom: 10px;">Repeat Request Summary</h3>
+                <p style="color: #10b981;">✓ Successful: ${successCount}</p>
+                <p style="color: #ef4444;">✗ Failed: ${failCount}</p>
+                <p style="color: #94a3b8;">Total: ${message.totalRequests}</p>
+              </div>
+            `;
+            
+            responseData.innerHTML += summaryHtml;
+            break;
 
           case "socketLog": // Logs del socket
             addSocketLog(message.message, message.type);
@@ -1529,6 +1780,112 @@
             socketPayloadTextarea.value = socketState.payload || "{}";
 
             updateSocketStatus(message.status.text, message.status.class);
+            break;
+          case "importedCollections": // Handle imported collections from JSON
+            if (message.collections && Array.isArray(message.collections)) {
+              // Add imported collections to the existing ones
+              const importedType = message.type || currentTab;
+              
+              // Filter out duplicates by name and type
+              message.collections.forEach(importedCol => {
+                const exists = collections.find(
+                  c => c.name === importedCol.name && c.type === importedCol.type
+                );
+                if (!exists) {
+                  collections.push(importedCol);
+                }
+              });
+
+              // Refresh the collection select
+              updateCollectionSelect();
+
+              // Save the updated state
+              saveGlobalState();
+
+              alert(`✅ ${message.collections.length} colección(es) importada(s) exitosamente.`);
+            }
+            break;
+          case "initializeCollections": // Load persisted collections from backend
+            if (message.collections && Array.isArray(message.collections)) {
+              // Merge with any collections from webview state
+              const webviewCollections = collections || [];
+              
+              // Create a map to avoid duplicates (prefer backend collections)
+              const collectionMap = new Map();
+              
+              // Add webview collections first
+              webviewCollections.forEach(col => {
+                const key = `${col.type}:${col.name}`;
+                collectionMap.set(key, col);
+              });
+              
+              // Override with backend collections (these are the source of truth)
+              message.collections.forEach(col => {
+                const key = `${col.type}:${col.name}`;
+                collectionMap.set(key, col);
+              });
+              
+              // Convert map back to array
+              collections = Array.from(collectionMap.values());
+              
+              // Update the UI
+              updateCollectionSelect();
+            }
+            break;
+          case "loadRequest": // Load request from sidebar
+            if (message.request) {
+              // Switch to HTTP tab
+              const httpTab = document.querySelector('.tab-button[data-tab="http"]');
+              if (httpTab) {
+                httpTab.click();
+              }
+
+              // Load the request data
+              urlInput.value = message.request.url || "";
+              methodSelect.value = message.request.method || "GET";
+              bodyTextarea.value = message.request.body || "";
+
+              // Load headers and params
+              if (message.request.headers) {
+                const headersObj = message.request.headers;
+                const headersArray = Object.keys(headersObj).map(key => ({
+                  key: key,
+                  value: headersObj[key]
+                }));
+                loadKeyValuesToContainer(headersContainer, headersArray, "header");
+              }
+
+              if (message.request.queryParams) {
+                const paramsObj = message.request.queryParams;
+                const paramsArray = Object.keys(paramsObj).map(key => ({
+                  key: key,
+                  value: paramsObj[key]
+                }));
+                loadKeyValuesToContainer(paramsContainer, paramsArray, "param");
+              }
+
+              // Load auth
+              if (message.request.authType) {
+                switchAuthTab(message.request.authType);
+                document.getElementById("bearer-token").value = message.request.authToken || "";
+                document.getElementById("basic-username").value = message.request.basicUsername || "";
+                document.getElementById("basic-password").value = message.request.basicPassword || "";
+              }
+
+              // Send the request automatically
+              sendRequest();
+            }
+            break;
+          case "loadCollection": // Load collection from sidebar
+            if (message.collection) {
+              applyCollectionToForm(message.collection);
+              
+              // Switch to the appropriate tab
+              const targetTab = document.querySelector(`.tab-button[data-tab="${message.collection.type}"]`);
+              if (targetTab) {
+                targetTab.click();
+              }
+            }
             break;
         }
       });

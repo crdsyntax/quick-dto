@@ -43,6 +43,11 @@
           "id": "socketTesterContainer",
           "title": "Socket Tester",
           "icon": "images/socket.svg"
+        },
+        {
+          "id": "httpTesterContainer",
+          "title": "HTTP Tester",
+          "icon": "images/socket.svg"
         }
       ]
     },
@@ -58,6 +63,14 @@
         {
           "id": "socketTesterView",
           "name": "Socket Tester",
+          "type": "webview",
+          "icon": "images/socket.svg"
+        }
+      ],
+      "httpTesterContainer": [
+        {
+          "id": "httpTesterView",
+          "name": "HTTP Tester",
           "type": "webview",
           "icon": "images/socket.svg"
         }
@@ -196,11 +209,6 @@
         },
         {
           "command": "nest-tools.clearSearchEntities",
-          "when": "view == nest-tools.entityView",
-          "group": "navigation"
-        },
-        {
-          "command": "nest-tools.openHttpTester",
           "when": "view == nest-tools.entityView",
           "group": "navigation"
         }

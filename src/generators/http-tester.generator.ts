@@ -5,12 +5,14 @@ export interface HttpRequest {
   url: string;
   method: Method;
   headers: Record<string, string>;
-  queryParams: Record<string, string>;
+  queryParams: Record<string, string | string[]>;
   body: any;
   authType: "none" | "bearer" | "basic";
   authToken?: string;
   basicUsername?: string;
   basicPassword?: string;
+  contentType?: "json" | "formdata";
+  files?: Array<{ fieldName: string; fileName: string; fileData: string }>;
 }
 
 export interface HttpResponse {
@@ -49,55 +51,99 @@ const mockDtos: Record<string, any> = {
   },
 };
 
-function getDefaultValue(typeName: string): any {
+function getDefaultValue(typeName: string, propertyName?: string): any {
   const type = typeName.toLowerCase();
+
+  // Valores específicos basados en el nombre de la propiedad
+  if (propertyName) {
+    const propLower = propertyName.toLowerCase();
+    if (propLower.includes("email")) return "user@example.com";
+    if (propLower.includes("name")) return "Example Name";
+    if (propLower.includes("id") && !propLower.includes("uuid")) return 1;
+    if (propLower.includes("uuid") || propLower.includes("guid"))
+      return "123e4567-e89b-12d3-a456-426614174000";
+    if (propLower.includes("phone") || propLower.includes("telefono"))
+      return "+1234567890";
+    if (propLower.includes("url") || propLower.includes("link"))
+      return "https://example.com";
+    if (propLower.includes("description") || propLower.includes("descripcion"))
+      return "Example description";
+  }
+
+  // Valores basados en el tipo
+  if (type.includes("email")) return "user@example.com";
   if (type.includes("string")) return "example string";
   if (type.includes("number") || type.includes("bigint")) return 123;
   if (type.includes("boolean")) return true;
-  if (type.includes("date")) return "2025-12-07T05:00:00Z";
-  // Manejo básico de arreglos y objetos
+  if (type.includes("date")) return "2025-12-08T00:00:00Z";
   if (type.includes("array") || type.includes("[]")) return [];
   if (type.includes("object") || type.includes("record")) return {};
+
   return null;
 }
 
 function parseDtoProperties(dtoContent: string): Record<string, any> {
   const body: Record<string, any> = {};
 
-  // Regex: Busca (propiedad) opcional (?) o requerida, seguida de dos puntos (:) y el (tipo)
-  // Captura: (propiedad) [?] : (tipo) [[]?];
-  const propertyRegex = /(\w+)\??:\s*(\w+)(?:\[\])?\s*;/g;
+  // Regex mejorado: Busca propiedades con sus decoradores
+  // Captura todo el bloque desde @ApiProperty hasta la declaración de la propiedad
+  const propertyBlockRegex =
+    /(@ApiProperty\([^)]*\)[\s\S]*?)?(\w+)\??:\s*(\w+)(?:\[\])?\s*;/g;
 
   let match;
-  while ((match = propertyRegex.exec(dtoContent)) !== null) {
-    const [, propertyName, propertyType] = match;
+  while ((match = propertyBlockRegex.exec(dtoContent)) !== null) {
+    const [fullMatch, apiPropertyDecorator, propertyName, propertyType] = match;
 
-    let finalType = propertyType;
+    let value: any = null;
 
-    // Asignación de valor: se prefiere el valor basado en la decoración de Class Validator si está presente
-    // Se busca en el texto inmediatamente anterior a la declaración de la propiedad.
-    const prevCode = dtoContent.substring(
-      Math.max(0, match.index - 200),
-      match.index
-    );
-
-    if (prevCode.includes("@IsBoolean()")) {
-      finalType = "boolean";
-    } else if (prevCode.includes("@IsString()")) {
-      finalType = "string";
-    } else if (prevCode.includes("@IsNumber()")) {
-      finalType = "number";
-    } else if (prevCode.includes("@IsDate()")) {
-      finalType = "date";
+    // 1. Intentar extraer el valor de ejemplo de @ApiProperty
+    if (apiPropertyDecorator) {
+      const exampleMatch = apiPropertyDecorator.match(/example:\s*([^,}\n]+)/);
+      if (exampleMatch) {
+        const exampleValue = exampleMatch[1].trim();
+        // Limpiar el valor (remover comillas, espacios, etc.)
+        if (exampleValue.startsWith('"') || exampleValue.startsWith("'")) {
+          value = exampleValue.slice(1, -1);
+        } else if (exampleValue === "true" || exampleValue === "false") {
+          value = exampleValue === "true";
+        } else if (!isNaN(Number(exampleValue))) {
+          value = Number(exampleValue);
+        } else {
+          value = exampleValue;
+        }
+      }
     }
 
-    // Solo incluimos la propiedad si tiene un tipo inferible.
-    if (finalType !== propertyType) {
-      body[propertyName] = getDefaultValue(finalType);
-    } else {
-      // Si no se pudo inferir por decorador, usamos el tipo de TypeScript.
-      body[propertyName] = getDefaultValue(propertyType);
+    // 2. Si no hay ejemplo, buscar en el código anterior por decoradores de class-validator
+    if (value === null) {
+      const prevCode = dtoContent.substring(
+        Math.max(0, match.index - 300),
+        match.index
+      );
+
+      let finalType = propertyType;
+
+      if (prevCode.includes("@IsBoolean()")) {
+        finalType = "boolean";
+      } else if (prevCode.includes("@IsString()")) {
+        finalType = "string";
+      } else if (prevCode.includes("@IsNumber()")) {
+        finalType = "number";
+      } else if (prevCode.includes("@IsDate()")) {
+        finalType = "date";
+      } else if (prevCode.includes("@IsEmail()")) {
+        finalType = "email";
+      } else if (prevCode.includes("@IsArray()")) {
+        finalType = "array";
+      }
+
+      value = getDefaultValue(
+        finalType !== propertyType ? finalType : propertyType,
+        propertyName
+      );
     }
+
+    body[propertyName] = value;
   }
 
   return body;
@@ -106,7 +152,6 @@ export class HttpTesterGenerator {
   private static instance: HttpTesterGenerator;
 
   private constructor() {}
-
 
   public static generateCollectionsFromController(
     controllerCode: string,
@@ -140,7 +185,7 @@ export class HttpTesterGenerator {
         .replace(/\/+/g, "/")
         .replace(/\/$/, "");
 
-      const bodyMatch = paramsString.match(/@Body\s*\(\)\s*(\w+)/);
+      const bodyMatch = paramsString.match(/@Body\s*\(\)\s*\w+:\s*(\w+)/);
       const paramMatch = paramsString.match(/@Param\("([^"]+)"\)\s*(\w+)/);
 
       const bodyDtoName = bodyMatch ? bodyMatch[1] : null;
@@ -206,12 +251,42 @@ export class HttpTesterGenerator {
         request.method.toUpperCase()
       );
 
+      let requestData: any;
+      const headers = this.prepareHeaders(request);
+
+      // Handle FormData
+      if (request.contentType === "formdata" && hasBody) {
+        const FormData = require("form-data");
+        const formData = new FormData();
+
+        // Add files if present
+        if (request.files && request.files.length > 0) {
+          for (const file of request.files) {
+            const buffer = Buffer.from(file.fileData, "base64");
+            formData.append(file.fieldName, buffer, file.fileName);
+          }
+        }
+
+        // Add JSON body fields as form fields
+        if (request.body && typeof request.body === "object") {
+          for (const [key, value] of Object.entries(request.body)) {
+            formData.append(key, value as string);
+          }
+        }
+
+        requestData = formData;
+        // FormData sets its own Content-Type with boundary
+        Object.assign(headers, formData.getHeaders());
+      } else {
+        requestData = hasBody ? request.body : undefined;
+      }
+
       const config: AxiosRequestConfig = {
         method: request.method,
         url: request.url,
-        headers: this.prepareHeaders(request),
+        headers: headers,
         params: request.queryParams,
-        data: hasBody ? request.body : undefined,
+        data: requestData,
         validateStatus: () => true,
       };
 
