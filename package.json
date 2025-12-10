@@ -1,8 +1,8 @@
 {
-  "name": "nest-helper-files",
-  "displayName": "NestJS tools Generator",
+  "name": "backend-tools-dev",
+  "displayName": "backend tools Generator",
   "description": "Genera DTOs con Swagger, Repository, Service, Controller y CRUD completo desde entidades TypeORM. Incluye autocompletado inteligente de funciones en controladores.",
-  "version": "2.106.1",
+  "version": "3.0.0",
   "publisher": "crdsyntax",
   "icon": "images/logo.jpg",
   "repository": {
@@ -36,13 +36,8 @@
       "activitybar": [
         {
           "id": "nest-tools-explorer",
-          "title": "NestJS Tools",
+          "title": "Entity visualizer",
           "icon": "images/entity.svg"
-        },
-        {
-          "id": "socketTesterContainer",
-          "title": "Socket Tester",
-          "icon": "images/socket.svg"
         },
         {
           "id": "httpTesterContainer",

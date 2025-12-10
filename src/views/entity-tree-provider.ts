@@ -3,14 +3,12 @@ import * as path from "path";
 import * as fs from "fs";
 
 export class EntityTreeDataProvider
-  implements vscode.TreeDataProvider<EntityItem>
+  implements vscode.TreeDataProvider<EntityItem | EntityFolderItem>
 {
   private _onDidChangeTreeData: vscode.EventEmitter<
-    EntityItem | undefined | null | void
-  > = new vscode.EventEmitter<EntityItem | undefined | null | void>();
-  readonly onDidChangeTreeData: vscode.Event<
-    EntityItem | undefined | null | void
-  > = this._onDidChangeTreeData.event;
+    EntityItem | EntityFolderItem | undefined | null | void
+  > = new vscode.EventEmitter();
+  readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private filterQuery: string = "";
 
@@ -25,67 +23,91 @@ export class EntityTreeDataProvider
     this.refresh();
   }
 
-  getTreeItem(element: EntityItem): vscode.TreeItem {
+  getTreeItem(element: EntityItem | EntityFolderItem): vscode.TreeItem {
     return element;
   }
 
-  getChildren(element?: EntityItem): Thenable<EntityItem[]> {
-    if (!this.workspaceRoot) {
-      vscode.window.showInformationMessage("No entity in empty workspace");
-      return Promise.resolve([]);
+  async getChildren(
+    element?: EntityItem | EntityFolderItem
+  ): Promise<(EntityItem | EntityFolderItem)[]> {
+    if (!this.workspaceRoot) return [];
+
+    const srcPath = path.join(this.workspaceRoot, "src");
+
+    if (!element) {
+      return this.getModuleFolders(srcPath);
     }
 
-    if (element) {
-      return Promise.resolve([]);
-    } else {
-      const entitiesPath = path.join(this.workspaceRoot, "src");
-      if (this.pathExists(entitiesPath)) {
-        return this.getEntitiesInSrc(entitiesPath);
-      } else {
-        vscode.window.showInformationMessage("Workspace has no src folder");
-        return Promise.resolve([]);
-      }
+    if (element instanceof EntityFolderItem) {
+      return this.getEntitiesInFolder(element.folderPath);
     }
+
+    return [];
   }
 
-  private async getEntitiesInSrc(srcPath: string): Promise<EntityItem[]> {
-    const entityPattern = new vscode.RelativePattern(srcPath, "**/*.entity.ts");
-    const schemaPattern = new vscode.RelativePattern(srcPath, "**/*.schema.ts");
+  private async getModuleFolders(srcPath: string): Promise<EntityFolderItem[]> {
+    const dirs = fs
+      .readdirSync(srcPath, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map(
+        (dir) =>
+          new EntityFolderItem(
+            dir.name,
+            path.join(srcPath, dir.name),
+            vscode.TreeItemCollapsibleState.Collapsed
+          )
+      );
 
-    const entityFiles = await vscode.workspace.findFiles(entityPattern);
-    const schemaFiles = await vscode.workspace.findFiles(schemaPattern);
+    if (!this.filterQuery) return dirs;
 
-    const allFiles = [...entityFiles, ...schemaFiles];
+    return dirs.filter((d) =>
+      d.label.toLowerCase().includes(this.filterQuery)
+    );
+  }
 
-    const items = allFiles.map((file) => {
-      const isEntity = file.fsPath.endsWith(".entity.ts");
-      const extensionToRemove = isEntity ? ".entity.ts" : ".schema.ts";
+  private async getEntitiesInFolder(folderPath: string): Promise<EntityItem[]> {
+    const entityPattern = new vscode.RelativePattern(
+      folderPath,
+      "**/*.entity.ts"
+    );
+    const schemaPattern = new vscode.RelativePattern(
+      folderPath,
+      "**/*.schema.ts"
+    );
 
-      const name = path.basename(file.fsPath, extensionToRemove);
+    const files = [
+      ...(await vscode.workspace.findFiles(entityPattern)),
+      ...(await vscode.workspace.findFiles(schemaPattern)),
+    ];
+
+    let items = files.map((file) => {
+      const base = file.fsPath.endsWith(".entity.ts")
+        ? path.basename(file.fsPath, ".entity.ts")
+        : path.basename(file.fsPath, ".schema.ts");
 
       return new EntityItem(
-        name,
+        base,
         file.fsPath,
         vscode.TreeItemCollapsibleState.None
       );
     });
 
-    if (!this.filterQuery) {
-      return items;
-    }
+    if (!this.filterQuery) return items;
 
-    return items.filter((item) =>
-      item.label.toLowerCase().includes(this.filterQuery)
+    return items.filter((i) =>
+      i.label.toLowerCase().includes(this.filterQuery)
     );
   }
+}
 
-  private pathExists(p: string): boolean {
-    try {
-      fs.accessSync(p);
-      return true;
-    } catch (err) {
-      return false;
-    }
+export class EntityFolderItem extends vscode.TreeItem {
+  constructor(
+    public readonly label: string,
+    public readonly folderPath: string,
+    collapsibleState: vscode.TreeItemCollapsibleState
+  ) {
+    super(label, collapsibleState);
+    this.iconPath = new vscode.ThemeIcon("folder-library");
   }
 }
 
@@ -93,11 +115,11 @@ export class EntityItem extends vscode.TreeItem {
   constructor(
     public readonly label: string,
     public readonly filePath: string,
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState
+    collapsibleState: vscode.TreeItemCollapsibleState
   ) {
     super(label, collapsibleState);
-    this.tooltip = `${this.label}`;
-    this.description = path.relative(vscode.workspace.rootPath || "", filePath);
+    this.description = path.basename(filePath);
+    this.tooltip = filePath;
 
     this.command = {
       command: "nest-tools.viewEntityErd",
@@ -108,3 +130,4 @@ export class EntityItem extends vscode.TreeItem {
     this.iconPath = new vscode.ThemeIcon("symbol-class");
   }
 }
+
