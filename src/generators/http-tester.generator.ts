@@ -288,6 +288,7 @@ export class HttpTesterGenerator {
         params: request.queryParams,
         data: requestData,
         validateStatus: () => true,
+        timeout: 10000,
       };
 
       const startTime = Date.now();

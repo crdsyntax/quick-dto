@@ -30,7 +30,6 @@ export async function generateErdData(
 
   const entities: Record<string, EntityData> = {};
 
-  // Parse all entities
   for (const file of sourceFiles) {
     const classes = file.getClasses();
     for (const cls of classes) {
@@ -47,13 +46,22 @@ export async function generateErdData(
       for (const prop of props) {
         const decorators = prop.getDecorators().map((d) => d.getName());
         const propName = prop.getName();
-        const propType = prop
+        let propType = prop
           .getType()
-          .getText()
+          .getText(prop)
+          .replace(/["']?import\(".*"\)\.?["']?/g, "")
           .replace(/\[\]$/, "")
           .replace(/Promise<(.+)>/, "$1");
 
-        // Check if it's a relation
+        if (propType.includes(".")) {
+          propType = propType.split(".").pop()!;
+        }
+
+        const typeObj = prop.getType();
+        const isEnum =
+          typeObj.isEnum() ||
+          (typeObj.isArray() && typeObj.getArrayElementType()?.isEnum());
+
         const relDecor = prop
           .getDecorators()
           .find((d) =>
@@ -62,8 +70,33 @@ export async function generateErdData(
             )
           );
 
+        const isRelation = !!relDecor;
+
+        const isPrimary = decorators.some(
+          (d) => d === "PrimaryGeneratedColumn" || d === "PrimaryColumn"
+        );
+
+        const isNullable =
+          prop.hasQuestionToken() ||
+          (decorators.some((d) => d === "Column") &&
+            prop.getDecorators().some((d) => {
+              const args = d.getArguments();
+              return args.some((arg) =>
+                arg.getText().includes("nullable: true")
+              );
+            }));
+
+        entityData.fields.push({
+          name: propName,
+          type: propType,
+          isPrimary,
+          isNullable,
+          isEnum: !!isEnum,
+          isRelation,
+          decorators,
+        });
+
         if (relDecor) {
-          // It's a relation
           let relTypeName = "";
           const arg = relDecor.getArguments()[0];
 
@@ -84,29 +117,6 @@ export async function generateErdData(
               propertyName: propName,
             });
           }
-        } else {
-          // It's a regular field - include ALL properties
-          const isPrimary = decorators.some(
-            (d) => d === "PrimaryGeneratedColumn" || d === "PrimaryColumn"
-          );
-
-          const isNullable =
-            prop.hasQuestionToken() ||
-            (decorators.some((d) => d === "Column") &&
-              prop.getDecorators().some((d) => {
-                const args = d.getArguments();
-                return args.some((arg) =>
-                  arg.getText().includes("nullable: true")
-                );
-              }));
-
-          entityData.fields.push({
-            name: propName,
-            type: propType,
-            isPrimary,
-            isNullable,
-            decorators,
-          });
         }
       }
 
@@ -114,7 +124,6 @@ export async function generateErdData(
     }
   }
 
-  // Build subgraph starting from root entity
   const visited = new Set<string>();
   const queue: Array<{ name: string; level: number }> = [
     { name: rootEntityName, level: 0 },
@@ -143,9 +152,140 @@ export async function generateErdData(
   };
 }
 
-/**
- * Generate Mermaid string from ERD data (for backward compatibility)
- */
+export async function generateErdDataForEntities(
+  rootPath: string,
+  entityNames: string[]
+): Promise<ErdDiagramData> {
+  const ENTITIES_PATH = rootPath + "/src/**/*.entity.ts";
+
+  const project = new Project({
+    tsConfigFilePath: rootPath + "/tsconfig.json",
+  });
+  const sourceFiles = project.addSourceFilesAtPaths(ENTITIES_PATH);
+
+  const entities: Record<string, EntityData> = {};
+
+  for (const file of sourceFiles) {
+    const classes = file.getClasses();
+    for (const cls of classes) {
+      const name = cls.getName();
+      if (!name) continue;
+
+      const entityData: EntityData = {
+        name,
+        fields: [],
+        relations: [],
+      };
+
+      const props = cls.getProperties();
+      for (const prop of props) {
+        const decorators = prop.getDecorators().map((d) => d.getName());
+        const propName = prop.getName();
+        let propType = prop
+          .getType()
+          .getText(prop)
+          .replace(/["']?import\(".*"\)\.?["']?/g, "")
+          .replace(/\[\]$/, "")
+          .replace(/Promise<(.+)>/, "$1");
+
+        if (propType.includes(".")) {
+          propType = propType.split(".").pop()!;
+        }
+
+        const typeObj = prop.getType();
+        const isEnum =
+          typeObj.isEnum() ||
+          (typeObj.isArray() && typeObj.getArrayElementType()?.isEnum());
+
+        const relDecor = prop
+          .getDecorators()
+          .find((d) =>
+            ["ManyToOne", "OneToMany", "OneToOne", "ManyToMany"].includes(
+              d.getName()
+            )
+          );
+
+        const isRelation = !!relDecor;
+
+        const isPrimary = decorators.some(
+          (d) => d === "PrimaryGeneratedColumn" || d === "PrimaryColumn"
+        );
+
+        const isNullable =
+          prop.hasQuestionToken() ||
+          (decorators.some((d) => d === "Column") &&
+            prop.getDecorators().some((d) => {
+              const args = d.getArguments();
+              return args.some((arg) =>
+                arg.getText().includes("nullable: true")
+              );
+            }));
+
+        entityData.fields.push({
+          name: propName,
+          type: propType,
+          isPrimary,
+          isNullable,
+          isEnum: !!isEnum,
+          isRelation,
+          decorators,
+        });
+
+        if (relDecor) {
+          let relTypeName = "";
+          const arg = relDecor.getArguments()[0];
+
+          if (arg) {
+            const txt = arg.getText();
+            const found = txt.match(/=>\s*([^.)\s]+)/);
+            if (found) relTypeName = found[1];
+          }
+
+          if (!relTypeName) {
+            relTypeName = propType;
+          }
+
+          if (relTypeName && relTypeName !== name) {
+            entityData.relations.push({
+              type: relDecor.getName() as any,
+              targetEntity: relTypeName,
+              propertyName: propName,
+            });
+          }
+        }
+      }
+
+      entities[name] = entityData;
+    }
+  }
+
+  // Filter requested entities AND their direct relations
+  const subEntities: Record<string, EntityData> = {};
+  const entitiesToInclude = new Set<string>(entityNames);
+
+  for (const name of entityNames) {
+    const entity = entities[name];
+    if (entity) {
+      for (const rel of entity.relations) {
+        if (entities[rel.targetEntity]) {
+          entitiesToInclude.add(rel.targetEntity);
+        }
+      }
+    }
+  }
+
+  for (const name of entitiesToInclude) {
+    if (entities[name]) {
+      subEntities[name] = entities[name];
+    }
+  }
+
+  return {
+    entities: subEntities,
+    rootEntity: entityNames[0] || "",
+  };
+}
+
 export async function generateMermaidString(
   rootPath: string,
   rootEntityName: string,

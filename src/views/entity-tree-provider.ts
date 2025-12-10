@@ -12,6 +12,8 @@ export class EntityTreeDataProvider
 
   private filterQuery: string = "";
 
+  private checkedItems: Set<string> = new Set();
+
   constructor(private workspaceRoot: string | undefined) {}
 
   refresh(): void {
@@ -23,7 +25,25 @@ export class EntityTreeDataProvider
     this.refresh();
   }
 
+  setChecked(item: EntityItem, state: vscode.TreeItemCheckboxState) {
+    if (state === vscode.TreeItemCheckboxState.Checked) {
+      this.checkedItems.add(item.filePath);
+    } else {
+      this.checkedItems.delete(item.filePath);
+    }
+    this.refresh();
+  }
+
+  getCheckedItems(): string[] {
+    return Array.from(this.checkedItems);
+  }
+
   getTreeItem(element: EntityItem | EntityFolderItem): vscode.TreeItem {
+    if (element instanceof EntityItem) {
+      element.checkboxState = this.checkedItems.has(element.filePath)
+        ? vscode.TreeItemCheckboxState.Checked
+        : vscode.TreeItemCheckboxState.Unchecked;
+    }
     return element;
   }
 
@@ -60,9 +80,7 @@ export class EntityTreeDataProvider
 
     if (!this.filterQuery) return dirs;
 
-    return dirs.filter((d) =>
-      d.label.toLowerCase().includes(this.filterQuery)
-    );
+    return dirs.filter((d) => d.label.toLowerCase().includes(this.filterQuery));
   }
 
   private async getEntitiesInFolder(folderPath: string): Promise<EntityItem[]> {
@@ -130,4 +148,3 @@ export class EntityItem extends vscode.TreeItem {
     this.iconPath = new vscode.ThemeIcon("symbol-class");
   }
 }
-

@@ -1,5 +1,8 @@
 import * as vscode from "vscode";
-import { generateErdData } from "../generators/er.generator";
+import {
+  generateErdData,
+  generateErdDataForEntities,
+} from "../generators/er.generator";
 import { SavedPositions } from "../types/erd-types";
 
 export class EntityVisualizer {
@@ -43,14 +46,20 @@ export class EntityVisualizer {
     extensionUri: vscode.Uri,
     entityName: string,
     rootPath: string,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
+    entityList?: string[]
   ) {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
 
     // Generate ERD data
-    const erdData = await generateErdData(rootPath, entityName);
+    let erdData;
+    if (entityList && entityList.length > 0) {
+      erdData = await generateErdDataForEntities(rootPath, entityList);
+    } else {
+      erdData = await generateErdData(rootPath, entityName);
+    }
 
     if (EntityVisualizer.currentPanel) {
       EntityVisualizer.currentPanel._panel.reveal(column);
@@ -197,6 +206,15 @@ export class EntityVisualizer {
                     fill: var(--vscode-terminal-ansiYellow);
                     font-weight: bold;
                 }
+
+                .field-enum {
+                    fill: var(--vscode-terminal-ansiCyan);
+                    font-style: italic;
+                }
+
+                .field-relation {
+                    fill: var(--vscode-terminal-ansiBlue);
+                }
                 
                 .relation-path {
                     fill: none;
@@ -209,6 +227,18 @@ export class EntityVisualizer {
                     fill: var(--vscode-descriptionForeground);
                     font-size: 11px;
                     text-anchor: middle;
+                }
+
+                .delete-btn {
+                    fill: var(--vscode-errorForeground);
+                    cursor: pointer;
+                    font-weight: bold;
+                    font-size: 16px; 
+                    opacity: 0.7;
+                }
+                
+                .delete-btn:hover {
+                    opacity: 1;
                 }
             </style>
         </head>
@@ -265,9 +295,12 @@ export class EntityVisualizer {
                         });
                     
                     svg.call(zoom);
+
+                    const linkGroup = container.append("g").attr("class", "links");
+                    const nodeGroup = container.append("g").attr("class", "nodes");
                     
-                    // Prepare node data
-                    const nodes = Object.entries(erdData.entities).map(function(entry) {
+                    // Prepare initial data
+                    let nodes = Object.entries(erdData.entities).map(function(entry) {
                         const name = entry[0];
                         const data = entry[1];
                         const fieldCount = data.fields.length || 1;
@@ -284,7 +317,7 @@ export class EntityVisualizer {
                     });
                     
                     // Prepare link data
-                    const links = [];
+                    let links = [];
                     Object.entries(erdData.entities).forEach(function(entry) {
                         const sourceName = entry[0];
                         const sourceData = entry[1];
@@ -298,17 +331,21 @@ export class EntityVisualizer {
                             }
                         });
                     });
-                    
-                    // Draw links
-                    const linkGroup = container.append("g").attr("class", "links");
-                    
-                    function updateLinks() {
-                        const linkElements = linkGroup.selectAll(".relation-path")
+
+                    function deleteNode(nodeId) {
+                        nodes = nodes.filter(function(n) { return n.id !== nodeId; });
+                        links = links.filter(function(l) { return l.source !== nodeId && l.target !== nodeId; });
+                        render();
+                    }
+
+                    function render() {
+                        // --- LINKS ---
+                        const linkSelection = linkGroup.selectAll("g")
                             .data(links, function(d) { return d.source + "-" + d.target; });
-                        
-                        linkElements.exit().remove();
-                        
-                        const linkEnter = linkElements.enter()
+
+                        linkSelection.exit().remove();
+
+                        const linkEnter = linkSelection.enter()
                             .append("g");
                         
                         linkEnter.append("path")
@@ -317,7 +354,120 @@ export class EntityVisualizer {
                         linkEnter.append("text")
                             .attr("class", "relation-label");
                         
-                        linkGroup.selectAll("g").each(function(d) {
+                        const allLinks = linkEnter.merge(linkSelection);
+
+                        // --- NODES ---
+                        const nodeSelection = nodeGroup.selectAll(".entity-node")
+                             .data(nodes, function(d) { return d.id; });
+                        
+                        nodeSelection.exit().remove();
+
+                        const nodeEnter = nodeSelection.enter()
+                             .append("g")
+                             .attr("class", "entity-node")
+                             .call(d3.drag()
+                                .on("start", dragStarted)
+                                .on("drag", dragged)
+                                .on("end", dragEnded)
+                             );
+                        
+                        // Draw entity boxes
+                        nodeEnter.append("rect")
+                            .attr("class", "entity-box")
+                            .attr("width", function(d) { return d.width; })
+                            .attr("height", function(d) { return d.height; });
+                        
+                        // Draw entity title background
+                        nodeEnter.append("rect")
+                            .attr("width", function(d) { return d.width; })
+                            .attr("height", config.nodeHeaderHeight)
+                            .attr("fill", "var(--vscode-titleBar-activeBackground)")
+                            .attr("opacity", 0.3);
+                        
+                        // Draw entity title
+                        nodeEnter.append("text")
+                            .attr("class", "entity-title")
+                            .attr("x", config.nodeWidth / 2)
+                            .attr("y", config.nodeHeaderHeight / 2)
+                            .attr("text-anchor", "middle")
+                            .attr("dominant-baseline", "middle")
+                            .text(function(d) { return d.id; });
+
+                        // Draw delete button
+                        nodeEnter.append("text")
+                            .attr("class", "delete-btn")
+                            .text("×")
+                            .attr("x", config.nodeWidth - 15)
+                            .attr("y", 22)
+                            .attr("text-anchor", "middle")
+                            .on("mousedown", function(e) { e.stopPropagation(); }) // Prevent drag start
+                            .on("click", function(e, d) {
+                                e.stopPropagation();
+                                deleteNode(d.id);
+                            });
+                        
+                        // Draw fields
+                        nodeEnter.each(function(d) {
+                            const node = d3.select(this);
+                            const fields = d.data.fields;
+                            
+                            if (fields.length === 0) {
+                                node.append("text")
+                                    .attr("class", "entity-field")
+                                    .attr("x", 10)
+                                    .attr("y", config.nodeHeaderHeight + 15)
+                                    .text("(no fields)");
+                            } else {
+                                fields.forEach(function(field, i) {
+                                    const y = config.nodeHeaderHeight + (i * config.fieldHeight) + 15;
+                                    let icon = "  ";
+                                    let className = "entity-field";
+                                    let typeDisplay = field.type;
+
+                                    if (field.isPrimary) {
+                                        icon = "🔑 ";
+                                        className = "field-primary";
+                                    } else if (field.isRelation) {
+                                        icon = "🔗 ";
+                                        className = "field-relation";
+                                    } else if (field.isEnum) {
+                                        icon = "E ";
+                                        className = "field-enum";
+                                        // Ensure generic enums (e.g. UserRole) display nicely
+                                        // The type already contains the name
+                                    }
+
+                                    const nullable = field.isNullable ? "?" : "";
+                                    
+                                    // Custom enum display format if requested
+                                    if (field.isEnum) {
+                                        typeDisplay = "ENUM " + field.type;
+                                    }
+
+                                    const text = icon + field.name + nullable + ": " + typeDisplay;
+                                    
+                                    node.append("text")
+                                        .attr("class", className)
+                                        .attr("x", 10)
+                                        .attr("y", y)
+                                        .text(text);
+                                });
+                            }
+                        });
+
+
+                        // Update positions for all nodes (entering and existing)
+                         nodeEnter.merge(nodeSelection)
+                            .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+
+                         updateLinks(allLinks, nodeEnter.merge(nodeSelection));
+                    }
+                    
+                    
+                    function updateLinks(linksSelection, nodesSelection) {
+                    
+                         
+                        linksSelection.each(function(d) {
                             const sourceNode = nodes.find(function(n) { return n.id === d.source; });
                             const targetNode = nodes.find(function(n) { return n.id === d.target; });
                             
@@ -343,71 +493,6 @@ export class EntityVisualizer {
                         });
                     }
                     
-                    // Draw nodes
-                    const nodeGroup = container.append("g").attr("class", "nodes");
-                    
-                    const nodeElements = nodeGroup.selectAll(".entity-node")
-                        .data(nodes, function(d) { return d.id; })
-                        .enter()
-                        .append("g")
-                        .attr("class", "entity-node")
-                        .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
-                        .call(d3.drag()
-                            .on("start", dragStarted)
-                            .on("drag", dragged)
-                            .on("end", dragEnded)
-                        );
-                    
-                    // Draw entity boxes
-                    nodeElements.append("rect")
-                        .attr("class", "entity-box")
-                        .attr("width", function(d) { return d.width; })
-                        .attr("height", function(d) { return d.height; });
-                    
-                    // Draw entity title background
-                    nodeElements.append("rect")
-                        .attr("width", function(d) { return d.width; })
-                        .attr("height", config.nodeHeaderHeight)
-                        .attr("fill", "var(--vscode-titleBar-activeBackground)")
-                        .attr("opacity", 0.3);
-                    
-                    // Draw entity title
-                    nodeElements.append("text")
-                        .attr("class", "entity-title")
-                        .attr("x", config.nodeWidth / 2)
-                        .attr("y", config.nodeHeaderHeight / 2)
-                        .attr("text-anchor", "middle")
-                        .attr("dominant-baseline", "middle")
-                        .text(function(d) { return d.id; });
-                    
-                    // Draw fields
-                    nodeElements.each(function(d) {
-                        const node = d3.select(this);
-                        const fields = d.data.fields;
-                        
-                        if (fields.length === 0) {
-                            node.append("text")
-                                .attr("class", "entity-field")
-                                .attr("x", 10)
-                                .attr("y", config.nodeHeaderHeight + 15)
-                                .text("(no fields)");
-                        } else {
-                            fields.forEach(function(field, i) {
-                                const y = config.nodeHeaderHeight + (i * config.fieldHeight) + 15;
-                                const icon = field.isPrimary ? "🔑 " : "  ";
-                                const nullable = field.isNullable ? "?" : "";
-                                const text = icon + field.name + nullable + ": " + field.type;
-                                
-                                node.append("text")
-                                    .attr("class", field.isPrimary ? "field-primary" : "entity-field")
-                                    .attr("x", 10)
-                                    .attr("y", y)
-                                    .text(text);
-                            });
-                        }
-                    });
-                    
-                    updateLinks();
                     
                     // Drag functions
                     function dragStarted(event, d) {
@@ -418,7 +503,12 @@ export class EntityVisualizer {
                         d.x = event.x;
                         d.y = event.y;
                         d3.select(this).attr("transform", "translate(" + d.x + "," + d.y + ")");
-                        updateLinks();
+                        
+                        // Pass current selections to updateLinks
+                        // We can just re-select them or pass them if we had them globally
+                        const allLinks = linkGroup.selectAll("g");
+                        const allNodes = nodeGroup.selectAll(".entity-node");
+                        updateLinks(allLinks, allNodes);
                     }
                     
                     function dragEnded(event, d) {
@@ -442,8 +532,7 @@ export class EntityVisualizer {
                             node.y = height / 2 + radius * Math.sin(angle) - node.height / 2;
                         });
                         
-                        nodeElements.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
-                        updateLinks();
+                        render(); // Re-render to update positions
                         
                         // Save new positions
                         const positions = {};
@@ -467,6 +556,9 @@ export class EntityVisualizer {
                         a.click();
                         URL.revokeObjectURL(url);
                     });
+
+                    // Initial render
+                    render();
                 })();
             </script>
         </body>

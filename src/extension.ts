@@ -32,9 +32,76 @@ export function activate(context: vscode.ExtensionContext) {
   const entityTreeProvider = new EntityTreeDataProvider(
     vscode.workspace.rootPath
   );
+  /* 
   vscode.window.registerTreeDataProvider(
     "nest-tools.entityView",
     entityTreeProvider
+  ); 
+  */
+
+  const treeView = vscode.window.createTreeView("nest-tools.entityView", {
+    treeDataProvider: entityTreeProvider,
+  });
+
+  treeView.onDidChangeCheckboxState((e) => {
+    e.items.forEach(([item, state]) => {
+      if (item instanceof EntityItem) {
+        entityTreeProvider.setChecked(item, state);
+      }
+    });
+  });
+
+  context.subscriptions.push(treeView);
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "nest-tools.renderSelectedEntities",
+      async () => {
+        const checkedPaths = entityTreeProvider.getCheckedItems();
+        if (checkedPaths.length === 0) {
+          vscode.window.showWarningMessage(
+            "Please select at least one entity to render."
+          );
+          return;
+        }
+
+        // We need to extract class names from these paths or just pass paths
+        // er.generator is updated to take entityNames.
+        // Wait, entity names are usually class names.
+        // We need to parse class names from paths or trust the entity items?
+        // The EntityItem label is usually the file basename, not class name.
+        // Let's resolve class names from paths.
+
+        const entityNames: string[] = [];
+
+        for (const p of checkedPaths) {
+          try {
+            const content = fs.readFileSync(p, "utf8");
+            const match = content.match(/export\s+class\s+(\w+)/);
+            if (match) {
+              entityNames.push(match[1]);
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }
+
+        if (entityNames.length === 0) {
+          vscode.window.showWarningMessage(
+            "No valid entities found in selection."
+          );
+          return;
+        }
+
+        EntityVisualizer.createOrShow(
+          context.extensionUri,
+          entityNames[0], // using first as 'root' for naming purpose mainly
+          vscode.workspace.rootPath || "",
+          context,
+          entityNames // pass the list!
+        );
+      }
+    )
   );
 
   const socketProvider = new SocketTesterViewProvider(context.extensionUri);

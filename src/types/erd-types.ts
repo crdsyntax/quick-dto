@@ -3,6 +3,8 @@ export interface EntityField {
   type: string;
   isPrimary?: boolean;
   isNullable?: boolean;
+  isEnum?: boolean;
+  isRelation?: boolean;
   decorators: string[];
 }
 
