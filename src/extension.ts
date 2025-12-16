@@ -27,17 +27,12 @@ import {
 import { HttpTesterSidebarProvider } from "./views/http-tester-sidebar.view";
 import { addLoggerDebugCommand } from "./commands/logger.command";
 import { generateCollectionsFromControllerCommand } from "./commands/generate-collection.command";
+import { HttpTesterPanel } from "./views/http-tester.view";
 
 export function activate(context: vscode.ExtensionContext) {
   const entityTreeProvider = new EntityTreeDataProvider(
     vscode.workspace.rootPath
   );
-  /* 
-  vscode.window.registerTreeDataProvider(
-    "nest-tools.entityView",
-    entityTreeProvider
-  ); 
-  */
 
   const treeView = vscode.window.createTreeView("nest-tools.entityView", {
     treeDataProvider: entityTreeProvider,
@@ -64,13 +59,6 @@ export function activate(context: vscode.ExtensionContext) {
           );
           return;
         }
-
-        // We need to extract class names from these paths or just pass paths
-        // er.generator is updated to take entityNames.
-        // Wait, entity names are usually class names.
-        // We need to parse class names from paths or trust the entity items?
-        // The EntityItem label is usually the file basename, not class name.
-        // Let's resolve class names from paths.
 
         const entityNames: string[] = [];
 
@@ -238,6 +226,31 @@ export function activate(context: vscode.ExtensionContext) {
     }),
     vscode.commands.registerCommand("nest-tools.clearSearchEntities", () => {
       entityTreeProvider.filter("");
+    }),
+
+    vscode.commands.registerCommand("nest-tools.openHttpTesterNewTab", () => {
+      HttpTesterPanel.createNewTab(context.extensionUri, context);
+    }),
+
+    vscode.commands.registerCommand("nest-tools.closeAllHttpTesterTabs", () => {
+      if (HttpTesterPanel.panels && HttpTesterPanel.panels.length > 0) {
+        const panels = [...HttpTesterPanel.panels];
+        panels.forEach((panel) => panel.dispose());
+        vscode.window.showInformationMessage(
+          `Closed ${panels.length} HTTP Tester tab(s)`
+        );
+      }
+    }),
+
+    vscode.commands.registerCommand("nest-tools.showHttpTesterInfo", () => {
+      const count = HttpTesterPanel.getPanelCount();
+      if (count === 0) {
+        vscode.window.showInformationMessage("No HTTP Tester tabs are open");
+      } else {
+        vscode.window.showInformationMessage(
+          `${count} HTTP Tester tab(s) currently open`
+        );
+      }
     })
   );
 
@@ -247,9 +260,19 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  vscode.window.showInformationMessage("NestJS Tools Activado 🚀 v2.106.0");
+  vscode.window.showInformationMessage("Backend tools active!");
 }
 
 export function deactivate() {
-  console.log("NestJS Tools desactivado");
+  if (HttpTesterPanel.panels && HttpTesterPanel.panels.length > 0) {
+    const panels = [...HttpTesterPanel.panels];
+    panels.forEach((panel) => {
+      try {
+        panel.dispose();
+      } catch (error) {
+        console.error("Error disposing panel:", error);
+      }
+    });
+  }
+  console.log("Backend Tools desactivado");
 }

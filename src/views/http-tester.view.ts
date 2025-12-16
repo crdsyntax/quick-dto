@@ -1,12 +1,11 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
-import { io, Socket } from "socket.io-client"; // Importación para Socket.IO
+import { io, Socket } from "socket.io-client";
 import {
   HttpCollection,
   HttpTesterGenerator,
 } from "../generators/http-tester.generator";
 
-// Interfaz para el estado del Socket Tester
 interface SocketTesterState {
   url: string;
   token: string;
@@ -16,7 +15,8 @@ interface SocketTesterState {
 }
 
 export class HttpTesterPanel {
-  public static currentPanel: HttpTesterPanel | undefined;
+  // Cambiar a un array para manejar múltiples paneles
+  public static panels: HttpTesterPanel[] = [];
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
   private _disposables: vscode.Disposable[] = [];
@@ -24,11 +24,10 @@ export class HttpTesterPanel {
   private static _context: vscode.ExtensionContext;
   private static readonly COLLECTIONS_STORAGE_KEY = "httpTester.collections";
 
-  // Propiedades de Socket.IO
+  // Propiedades de Socket.IO (específicas por panel)
   private socket?: Socket;
-  private socketChannel: vscode.OutputChannel; // Canal de salida para logs del socket
+  private socketChannel: vscode.OutputChannel;
   private _socketState: SocketTesterState = {
-    // Estado inicial del socket
     url: "http://localhost:3000",
     token: "",
     userId: "",
@@ -41,20 +40,31 @@ export class HttpTesterPanel {
     class: "disconnected",
   };
 
+  // ID único para cada panel
+  private readonly _id: string;
+
   private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
     this._panel = panel;
     this._extensionUri = extensionUri;
+    this._id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
 
-    this._panel.webview.html = this._getHtmlForWebview();
+    // Configurar el panel
+    this._panel.title = `API Tester ${HttpTesterPanel.panels.length + 1}`;
+    this._panel.webview.html = this._getHtmlForWebview(this._id);
     this._setWebviewMessageListener(this._panel.webview);
 
+    // Manejar el cierre del panel
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
-    // Inicializar el canal de salida del socket
-    this.socketChannel = vscode.window.createOutputChannel("Socket Tester Log");
-    this.socketChannel.show(true);
+    // Inicializar el canal de salida del socket con nombre único
+    this.socketChannel = vscode.window.createOutputChannel(
+      `Socket Tester Log #${HttpTesterPanel.panels.length + 1}`
+    );
 
-    // Load and send saved collections to webview
+    // Añadir a la lista de paneles activos
+    HttpTesterPanel.panels.push(this);
+
+    // Cargar colecciones
     this._loadAndSendCollections();
   }
 
@@ -69,23 +79,17 @@ export class HttpTesterPanel {
 
   public static createOrShow(
     extensionUri: vscode.Uri,
-    context?: vscode.ExtensionContext
+    context?: vscode.ExtensionContext,
+    title?: string
   ) {
     // Store context if provided
     if (context) {
       HttpTesterPanel._context = context;
     }
 
-    if (HttpTesterPanel.currentPanel) {
-      HttpTesterPanel.currentPanel._panel.reveal(vscode.ViewColumn.One);
-      // Reload collections in case they changed
-      HttpTesterPanel.currentPanel._loadAndSendCollections();
-      return;
-    }
-
     const panel = vscode.window.createWebviewPanel(
       "httpTester",
-      "API Tester", // Título general para el panel combinado
+      title || `API Tester ${HttpTesterPanel.panels.length + 1}`,
       vscode.ViewColumn.One,
       {
         enableScripts: true,
@@ -94,10 +98,27 @@ export class HttpTesterPanel {
       }
     );
 
-    HttpTesterPanel.currentPanel = new HttpTesterPanel(panel, extensionUri);
+    new HttpTesterPanel(panel, extensionUri);
   }
 
-  private _getHtmlForWebview(): string {
+  public static createNewTab(
+    extensionUri: vscode.Uri,
+    context?: vscode.ExtensionContext
+  ) {
+    this.createOrShow(extensionUri, context, `API Tester ${this.panels.length + 1}`);
+  }
+
+  public static showAllPanels() {
+    HttpTesterPanel.panels.forEach((panel, index) => {
+      panel._panel.reveal();
+    });
+  }
+
+  public static getPanelCount(): number {
+    return HttpTesterPanel.panels.length;
+  }
+
+  private _getHtmlForWebview(panelId: string): string {
     const htmlPath = vscode.Uri.joinPath(
       this._extensionUri,
       "media",
@@ -109,7 +130,9 @@ export class HttpTesterPanel {
       vscode.Uri.joinPath(this._extensionUri, "media")
     );
 
+    // Inyectar el ID del panel en el HTML para identificación
     html = html.replace(/{{root}}/g, rootUri.toString());
+    html = html.replace(/{{panelId}}/g, panelId);
 
     return html;
   }
@@ -120,8 +143,13 @@ export class HttpTesterPanel {
     message: string,
     type: "info" | "error" | "event" = "info"
   ) {
-    // Enviar log al Webview
-    this._panel.webview.postMessage({ command: "socketLog", message, type });
+    // Enviar log al Webview con ID del panel
+    this._panel.webview.postMessage({ 
+      command: "socketLog", 
+      message, 
+      type,
+      panelId: this._id 
+    });
     // Enviar log al canal de salida de VS Code
     this.socketChannel.appendLine(`[${type.toUpperCase()}] ${message}`);
   }
@@ -135,6 +163,7 @@ export class HttpTesterPanel {
       command: "socketStatus",
       status: status,
       className: className,
+      panelId: this._id
     });
     this.socketChannel.appendLine(`[STATUS] ${status}`);
   }
@@ -198,6 +227,7 @@ export class HttpTesterPanel {
       this._panel.webview.postMessage({
         command: "error",
         message: "Socket is not connected.",
+        panelId: this._id
       });
       return;
     }
@@ -226,12 +256,18 @@ export class HttpTesterPanel {
       this._panel.webview.postMessage({
         command: "error",
         message: `Invalid JSON Payload: ${err.message}`,
+        panelId: this._id
       });
     }
   }
 
   private _handleSocketMessage(msg: any) {
-    const { command, data } = msg;
+    const { command, data, panelId } = msg;
+
+    // Verificar que el mensaje sea para este panel
+    if (panelId && panelId !== this._id) {
+      return;
+    }
 
     // Actualiza el estado local cada vez que el usuario interactúa
     if (data && command === "socketStateUpdate") {
@@ -246,7 +282,6 @@ export class HttpTesterPanel {
         this._disconnectSocket();
         break;
       case "socketEmit":
-        // Solo necesitamos el nombre del evento y el payload para emitir
         this._emitEvent(data);
         break;
       case "socketGetInitialState":
@@ -255,6 +290,7 @@ export class HttpTesterPanel {
           command: "socketInitialState",
           state: this._socketState,
           status: this._lastSocketStatus,
+          panelId: this._id
         });
         break;
     }
@@ -266,12 +302,19 @@ export class HttpTesterPanel {
     webview.onDidReceiveMessage(
       async (msg) => {
         try {
+          // Verificar si el mensaje es para este panel
+          if (msg.panelId && msg.panelId !== this._id) {
+            return;
+          }
+
           if (msg.command === "sendRequest") {
-            // Lógica HTTP
             const result = await this._generator.sendRequest(msg.request);
-            webview.postMessage({ command: "response", response: result });
+            webview.postMessage({ 
+              command: "response", 
+              response: result,
+              panelId: this._id 
+            });
           } else if (msg.command === "repeatRequest") {
-            // Lógica de repetición de peticiones
             const repeatCount = msg.repeatCount || 1;
             const results = [];
 
@@ -284,12 +327,12 @@ export class HttpTesterPanel {
                   response: result,
                 });
 
-                // Enviar progreso al webview
                 webview.postMessage({
                   command: "repeatProgress",
                   current: i + 1,
                   total: repeatCount,
                   response: result,
+                  panelId: this._id
                 });
               } catch (error) {
                 results.push({
@@ -300,29 +343,32 @@ export class HttpTesterPanel {
               }
             }
 
-            // Enviar resumen final
             webview.postMessage({
               command: "repeatComplete",
               results: results,
               totalRequests: repeatCount,
+              panelId: this._id
             });
           } else if (msg.command === "importJson") {
-            // Handle JSON import
             await this._handleImportJson(msg.type);
           } else if (msg.command === "exportJson") {
-            // Handle JSON export
             await this._handleExportJson(msg.type, msg.collections);
           } else if (msg.command === "saveCollections") {
-            // Save collections to persistent storage
             await this._saveCollections(msg.collections);
           } else if (msg.command.startsWith("socket")) {
-            // Lógica de Socket.IO
             this._handleSocketMessage(msg);
+          } else if (msg.command === "getPanelId") {
+            // Responder con el ID del panel
+            webview.postMessage({
+              command: "panelId",
+              panelId: this._id
+            });
           }
         } catch (err) {
           webview.postMessage({
             command: "error",
             message: err instanceof Error ? err.message : String(err),
+            panelId: this._id
           });
         }
       },
@@ -331,9 +377,12 @@ export class HttpTesterPanel {
     );
   }
 
+  // ... (Los métodos _handleImportJson, _saveCollections, _loadCollections, 
+  // _loadAndSendCollections, _handleExportJson se mantienen igual)
+  // Solo asegúrate de incluir panelId en los mensajes cuando sea necesario
+
   private async _handleImportJson(type: "http" | "socket") {
     try {
-      // Show file picker
       const fileUri = await vscode.window.showOpenDialog({
         canSelectMany: false,
         openLabel: "Importar JSON",
@@ -343,26 +392,22 @@ export class HttpTesterPanel {
       });
 
       if (!fileUri || fileUri.length === 0) {
-        return; // User cancelled
+        return;
       }
 
-      // Read the file
       const fs = require("fs");
       const fileContent = fs.readFileSync(fileUri[0].fsPath, "utf8");
 
-      // Parse JSON
       let collections: HttpCollection[];
       try {
         const parsed = JSON.parse(fileContent);
 
-        // Check if it's an array or a single object
         if (Array.isArray(parsed)) {
           collections = parsed;
         } else {
           collections = [parsed];
         }
 
-        // Validate that all collections have the required fields
         const validCollections = collections.filter((col) => {
           return col.name && col.type && col.url;
         });
@@ -374,7 +419,6 @@ export class HttpTesterPanel {
           return;
         }
 
-        // Filter by type if needed
         const filteredCollections = validCollections.filter(
           (col) => col.type === type
         );
@@ -386,11 +430,11 @@ export class HttpTesterPanel {
           return;
         }
 
-        // Send to webview
         this._panel.webview.postMessage({
           command: "importedCollections",
           collections: filteredCollections,
           type: type,
+          panelId: this._id
         });
       } catch (parseError) {
         vscode.window.showErrorMessage(
@@ -409,8 +453,6 @@ export class HttpTesterPanel {
       );
     }
   }
-
-  // --- Collection Persistence Methods ---
 
   private async _saveCollections(collections: HttpCollection[]) {
     if (!HttpTesterPanel._context) {
@@ -440,6 +482,7 @@ export class HttpTesterPanel {
       this._panel.webview.postMessage({
         command: "initializeCollections",
         collections: collections,
+        panelId: this._id
       });
     }
   }
@@ -449,7 +492,6 @@ export class HttpTesterPanel {
     collections: HttpCollection[]
   ) {
     try {
-      // Filter collections by type
       const filteredCollections = collections.filter(
         (col) => col.type === type
       );
@@ -461,7 +503,6 @@ export class HttpTesterPanel {
         return;
       }
 
-      // Show save dialog
       const fileUri = await vscode.window.showSaveDialog({
         defaultUri: vscode.Uri.file(`${type}-collections.json`),
         filters: {
@@ -470,10 +511,9 @@ export class HttpTesterPanel {
       });
 
       if (!fileUri) {
-        return; // User cancelled
+        return;
       }
 
-      // Write to file
       const fs = require("fs");
       const jsonContent = JSON.stringify(filteredCollections, null, 2);
       fs.writeFileSync(fileUri.fsPath, jsonContent, "utf8");
@@ -491,10 +531,14 @@ export class HttpTesterPanel {
   }
 
   public dispose() {
-    HttpTesterPanel.currentPanel = undefined;
+    // Remover este panel de la lista
+    const index = HttpTesterPanel.panels.indexOf(this);
+    if (index > -1) {
+      HttpTesterPanel.panels.splice(index, 1);
+    }
 
-    this._disconnectSocket(); // Asegurar el cierre del socket al cerrar el panel
-    this.socketChannel.dispose(); // Disponer el canal de salida
+    this._disconnectSocket();
+    this.socketChannel.dispose();
 
     while (this._disposables.length) {
       const d = this._disposables.pop();

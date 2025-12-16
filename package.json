@@ -193,6 +193,31 @@
       {
         "command": "nest-tools.generateHttpCollections",
         "title": "NestJS Tools: Generar Colecciones HTTP (Controller)"
+      },
+      {
+        "command": "nest-tools.openHttpTester",
+        "title": "API Tester: Open",
+        "category": "NestJS Tools"
+      },
+      {
+        "command": "nest-tools.openHttpTesterNewTab",
+        "title": "API Tester: New Tab",
+        "category": "NestJS Tools"
+      },
+      {
+        "command": "nest-tools.closeAllHttpTesterTabs",
+        "title": "API Tester: Close All Tabs",
+        "category": "NestJS Tools"
+      },
+      {
+        "command": "nest-tools.showHttpTesterInfo",
+        "title": "API Tester: Show Info",
+        "category": "NestJS Tools"
+      },
+      {
+        "command": "nest-tools.focusHttpTester",
+        "title": "API Tester: Focus",
+        "category": "NestJS Tools"
       }
     ],
     "menus": {
@@ -263,6 +288,11 @@
           "command": "nest-tools.generateErd",
           "when": "resourceFilename =~ /\\.entity\\.ts$/",
           "group": "nestjs@8"
+        },
+        {
+          "command": "nest-tools.generateHttpCollections",
+          "group": "NestJS Tools",
+          "when": "resourceLangId == 'typescript'"
         }
       ],
       "editor/context": [
@@ -295,6 +325,16 @@
           "command": "nest-tools.addLoggerDebug",
           "when": "editorHasSelection",
           "group": "modification"
+        },
+        {
+          "command": "nest-tools.openHttpTesterNewTab",
+          "group": "navigation",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "nest-tools.openHttpTester",
+          "group": "navigation",
+          "when": "editorTextFocus"
         }
       ],
       "command-palette": [
@@ -310,6 +350,18 @@
         {
           "command": "nest-tools.openHttpTester",
           "when": "true"
+        },
+        {
+          "command": "nest-tools.openHttpTesterNewTab",
+          "when": "always"
+        },
+        {
+          "command": "nest-tools.closeAllHttpTesterTabs",
+          "when": "always"
+        },
+        {
+          "command": "nest-tools.showHttpTesterInfo",
+          "when": "always"
         }
       ]
     },
