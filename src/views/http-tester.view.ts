@@ -77,11 +77,20 @@ export class HttpTesterPanel {
     }
   }
 
+  public loadCollection(collection: HttpCollection) {
+    if (this._panel) {
+      this._panel.webview.postMessage({
+        command: "loadCollection",
+        collection: collection,
+      });
+    }
+  }
+
   public static createOrShow(
     extensionUri: vscode.Uri,
     context?: vscode.ExtensionContext,
     title?: string
-  ) {
+  ): HttpTesterPanel {
     // Store context if provided
     if (context) {
       HttpTesterPanel._context = context;
@@ -98,14 +107,18 @@ export class HttpTesterPanel {
       }
     );
 
-    new HttpTesterPanel(panel, extensionUri);
+    return new HttpTesterPanel(panel, extensionUri);
   }
 
   public static createNewTab(
     extensionUri: vscode.Uri,
     context?: vscode.ExtensionContext
   ) {
-    this.createOrShow(extensionUri, context, `API Tester ${this.panels.length + 1}`);
+    this.createOrShow(
+      extensionUri,
+      context,
+      `API Tester ${this.panels.length + 1}`
+    );
   }
 
   public static showAllPanels() {
@@ -144,11 +157,11 @@ export class HttpTesterPanel {
     type: "info" | "error" | "event" = "info"
   ) {
     // Enviar log al Webview con ID del panel
-    this._panel.webview.postMessage({ 
-      command: "socketLog", 
-      message, 
+    this._panel.webview.postMessage({
+      command: "socketLog",
+      message,
       type,
-      panelId: this._id 
+      panelId: this._id,
     });
     // Enviar log al canal de salida de VS Code
     this.socketChannel.appendLine(`[${type.toUpperCase()}] ${message}`);
@@ -163,7 +176,7 @@ export class HttpTesterPanel {
       command: "socketStatus",
       status: status,
       className: className,
-      panelId: this._id
+      panelId: this._id,
     });
     this.socketChannel.appendLine(`[STATUS] ${status}`);
   }
@@ -227,7 +240,7 @@ export class HttpTesterPanel {
       this._panel.webview.postMessage({
         command: "error",
         message: "Socket is not connected.",
-        panelId: this._id
+        panelId: this._id,
       });
       return;
     }
@@ -256,7 +269,7 @@ export class HttpTesterPanel {
       this._panel.webview.postMessage({
         command: "error",
         message: `Invalid JSON Payload: ${err.message}`,
-        panelId: this._id
+        panelId: this._id,
       });
     }
   }
@@ -290,7 +303,7 @@ export class HttpTesterPanel {
           command: "socketInitialState",
           state: this._socketState,
           status: this._lastSocketStatus,
-          panelId: this._id
+          panelId: this._id,
         });
         break;
     }
@@ -309,10 +322,10 @@ export class HttpTesterPanel {
 
           if (msg.command === "sendRequest") {
             const result = await this._generator.sendRequest(msg.request);
-            webview.postMessage({ 
-              command: "response", 
+            webview.postMessage({
+              command: "response",
               response: result,
-              panelId: this._id 
+              panelId: this._id,
             });
           } else if (msg.command === "repeatRequest") {
             const repeatCount = msg.repeatCount || 1;
@@ -332,7 +345,7 @@ export class HttpTesterPanel {
                   current: i + 1,
                   total: repeatCount,
                   response: result,
-                  panelId: this._id
+                  panelId: this._id,
                 });
               } catch (error) {
                 results.push({
@@ -347,7 +360,7 @@ export class HttpTesterPanel {
               command: "repeatComplete",
               results: results,
               totalRequests: repeatCount,
-              panelId: this._id
+              panelId: this._id,
             });
           } else if (msg.command === "importJson") {
             await this._handleImportJson(msg.type);
@@ -361,14 +374,14 @@ export class HttpTesterPanel {
             // Responder con el ID del panel
             webview.postMessage({
               command: "panelId",
-              panelId: this._id
+              panelId: this._id,
             });
           }
         } catch (err) {
           webview.postMessage({
             command: "error",
             message: err instanceof Error ? err.message : String(err),
-            panelId: this._id
+            panelId: this._id,
           });
         }
       },
@@ -376,10 +389,6 @@ export class HttpTesterPanel {
       this._disposables
     );
   }
-
-  // ... (Los métodos _handleImportJson, _saveCollections, _loadCollections, 
-  // _loadAndSendCollections, _handleExportJson se mantienen igual)
-  // Solo asegúrate de incluir panelId en los mensajes cuando sea necesario
 
   private async _handleImportJson(type: "http" | "socket") {
     try {
@@ -434,7 +443,7 @@ export class HttpTesterPanel {
           command: "importedCollections",
           collections: filteredCollections,
           type: type,
-          panelId: this._id
+          panelId: this._id,
         });
       } catch (parseError) {
         vscode.window.showErrorMessage(
@@ -463,6 +472,12 @@ export class HttpTesterPanel {
       HttpTesterPanel.COLLECTIONS_STORAGE_KEY,
       collections
     );
+
+    // Refresh Sidebar
+    const { HttpTesterSidebarProvider } = require("./http-tester-sidebar.view");
+    if (HttpTesterSidebarProvider.instance) {
+      HttpTesterSidebarProvider.instance.refreshCollections();
+    }
   }
 
   private _loadCollections(): HttpCollection[] {
@@ -482,7 +497,7 @@ export class HttpTesterPanel {
       this._panel.webview.postMessage({
         command: "initializeCollections",
         collections: collections,
-        panelId: this._id
+        panelId: this._id,
       });
     }
   }

@@ -148,13 +148,13 @@
     <div class="header">
       <h2>HTTP Tester</h2>
       <button class="button primary" id="open-editor-button">
-        ✨ Abrir en Editor
+        ✨ Nueva ventana
       </button>
       <button class="button import-button" id="import-json-button">
-        📥 Importar JSON
+        📥 Importar coleccion JSON
       </button>
       <button class="button secondary" id="export-json-button">
-        📤 Exportar JSON
+        📤 Exportar coleccion JSON
       </button>
     </div>
 
@@ -287,6 +287,9 @@
 
       // Initial render
       renderCollections();
+
+      // Signal ready
+      vscode.postMessage({ command: "ready" });
     </script>
   </body>
 </html>

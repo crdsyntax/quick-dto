@@ -101,7 +101,8 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   const httpTesterProvider = new HttpTesterSidebarProvider(
-    context.extensionUri
+    context.extensionUri,
+    context
   );
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(

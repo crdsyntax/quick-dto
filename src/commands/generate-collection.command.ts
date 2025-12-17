@@ -6,9 +6,10 @@ import {
   HttpCollection,
 } from "../generators/http-tester.generator";
 import { HttpTesterPanel } from "../views/http-tester.view";
+import { loadConfig, createMatchPath } from "tsconfig-paths";
 
 /**
- * Busca un DTO por import real
+ * Resolver DTO considerando paths relativos y alias de tsconfig
  */
 function resolveDtoPath(
   dtoName: string,
@@ -21,122 +22,39 @@ function resolveDtoPath(
   );
 
   const match = importRegex.exec(controllerCode);
-  if (!match) {
-    return null;
-  }
+  if (!match) return null;
 
   const importPath = match[1];
   const controllerDir = path.dirname(controllerPath);
 
-  // Ruta directa
   let dtoFilePath = path.resolve(controllerDir, importPath + ".ts");
-  if (fs.existsSync(dtoFilePath)) {
-    return dtoFilePath;
-  }
+  if (fs.existsSync(dtoFilePath)) return dtoFilePath;
 
-  // index.ts
   dtoFilePath = path.resolve(controllerDir, importPath, "index.ts");
-  if (fs.existsSync(dtoFilePath)) {
-    return dtoFilePath;
-  }
+  if (fs.existsSync(dtoFilePath)) return dtoFilePath;
 
-  return null;
-}
-
-/**
- * Fallback heurístico para encontrar archivos DTO
- */
-function findDtoFile(dtoName: string, controllerPath: string): string | null {
-  const controllerDir = path.dirname(controllerPath);
+  // Resolver alias usando tsconfig.json
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-
-  if (!workspaceRoot) {
-    return null;
-  }
-
-  // Rutas típicas
-  const possiblePaths = [
-    path.join(controllerDir, `${dtoName}.ts`),
-    path.join(controllerDir, `${dtoName.toLowerCase()}.ts`),
-
-    path.join(controllerDir, "..", "dto", `${dtoName}.ts`),
-    path.join(controllerDir, "..", "dto", `${dtoName.toLowerCase()}.ts`),
-
-    path.join(controllerDir, "dto", `${dtoName}.ts`),
-    path.join(controllerDir, "dto", `${dtoName.toLowerCase()}.ts`),
-
-    path.join(controllerDir, "..", "dtos", `${dtoName}.ts`),
-    path.join(controllerDir, "dtos", `${dtoName}.ts`),
-  ];
-
-  for (const filePath of possiblePaths) {
-    if (fs.existsSync(filePath)) {
-      return fs.readFileSync(filePath, "utf8");
-    }
-  }
-
-  // Búsqueda profunda
-  try {
-    const files = findFilesRecursive(workspaceRoot, `${dtoName}.ts`);
-    if (files.length > 0) {
-      return fs.readFileSync(files[0], "utf8");
-    }
-  } catch {}
-
-  return null;
-}
-
-/**
- * Busca archivos recursivamente (controlado)
- */
-function findFilesRecursive(
-  dir: string,
-  filename: string,
-  maxDepth: number = 5,
-  currentDepth: number = 0
-): string[] {
-  if (currentDepth > maxDepth) return [];
-
-  const results: string[] = [];
-  let files: string[] = [];
-
-  try {
-    files = fs.readdirSync(dir);
-  } catch {
-    return results;
-  }
-
-  for (const file of files) {
-    const filePath = path.join(dir, file);
-
-    if (file === "node_modules" || file.startsWith(".")) continue;
-
+  if (workspaceRoot && importPath.startsWith("@")) {
     try {
-      const stat = fs.statSync(filePath);
-
-      if (stat.isDirectory()) {
-        results.push(
-          ...findFilesRecursive(filePath, filename, maxDepth, currentDepth + 1)
-        );
-      } else if (file.toLowerCase() === filename.toLowerCase()) {
-        results.push(filePath);
+      const config = loadConfig(workspaceRoot);
+      if (config.resultType === "success") {
+        const matchPath = createMatchPath(config.absoluteBaseUrl, config.paths);
+        const resolved = matchPath(importPath);
+        if (resolved && fs.existsSync(resolved)) return resolved;
       }
     } catch {}
   }
 
-  return results;
+  return null;
 }
 
 /**
- * Extraer nombres de DTO:
- * - importaciones
- * - parámetros de métodos
+ * Extracción de DTOs: importaciones y parámetros @Body
  */
 function extractDtoNames(controllerCode: string): string[] {
   const dtoNames: string[] = [];
-
-  // Import de DTOs
-  const importRegex = /import\s+{([^}]+)}\s+from\s+['"][^'"]+['"]/g;
+  const importRegex = /import\s+{([^}]+)}\s+from\s+['"][^'"]+['"]/gs;
   let match;
 
   while ((match = importRegex.exec(controllerCode)) !== null) {
@@ -144,20 +62,16 @@ function extractDtoNames(controllerCode: string): string[] {
       .split(",")
       .map((i) => i.trim())
       .filter((i) => /Dto$/i.test(i));
-
-    for (const name of names) {
-      if (!dtoNames.includes(name)) dtoNames.push(name);
-    }
+    names.forEach((n) => {
+      if (!dtoNames.includes(n)) dtoNames.push(n);
+    });
   }
 
-  // Parámetros con DTO en @Body()
   const paramRegex = /@Body\s*\(\)\s+\w+:\s*(\w+)/g;
-
   while ((match = paramRegex.exec(controllerCode)) !== null) {
     const dtoName = match[1];
-    if (/Dto$/i.test(dtoName) && !dtoNames.includes(dtoName)) {
+    if (/Dto$/i.test(dtoName) && !dtoNames.includes(dtoName))
       dtoNames.push(dtoName);
-    }
   }
 
   return dtoNames;
@@ -170,13 +84,23 @@ export async function generateCollectionsFromControllerCommand(
   context: vscode.ExtensionContext,
   fileUri: vscode.Uri
 ) {
-  if (!fileUri || !fileUri.fsPath) {
-    vscode.window.showErrorMessage("No se pudo obtener la ruta del archivo.");
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || !fileUri?.fsPath) {
+    vscode.window.showErrorMessage(
+      "No se pudo obtener la información del archivo."
+    );
     return;
   }
 
   try {
-    const controllerCode = fs.readFileSync(fileUri.fsPath, "utf8");
+    const fullCode =
+      editor.document.uri.fsPath === fileUri.fsPath
+        ? editor.document.getText()
+        : fs.readFileSync(fileUri.fsPath, "utf8");
+
+    const selection = editor.selection;
+    const hasSelection = !selection.isEmpty;
+    const selectedText = hasSelection ? editor.document.getText(selection) : "";
 
     const baseUrl = await vscode.window.showInputBox({
       prompt: "Introduce la URL Base del API (ej: http://localhost:3000)",
@@ -185,127 +109,91 @@ export async function generateCollectionsFromControllerCommand(
         .get("defaultBaseUrl", "http://localhost:3000"),
       ignoreFocusOut: true,
     });
+    if (!baseUrl)
+      return vscode.window.showWarningMessage("Operación cancelada.");
 
-    if (!baseUrl) {
-      vscode.window.showWarningMessage("Operación cancelada.");
-      return;
-    }
-
-    const dtoNames = extractDtoNames(controllerCode);
-
+    // --- Extracción de DTOs del archivo completo ---
+    const dtoNames = extractDtoNames(fullCode);
     const dtoContents: Record<string, string> = {};
 
     for (const dtoName of dtoNames) {
       let dtoContent: string | null = null;
-
-      // 1) Intentar resolver por import
-      const realPath = resolveDtoPath(dtoName, fileUri.fsPath, controllerCode);
-
-      if (realPath && fs.existsSync(realPath)) {
+      const realPath = resolveDtoPath(dtoName, fileUri.fsPath, fullCode);
+      if (realPath && fs.existsSync(realPath))
         dtoContent = fs.readFileSync(realPath, "utf8");
-      } else {
-        // 2) fallback heurístico
-        dtoContent = findDtoFile(dtoName, fileUri.fsPath);
-      }
 
-      if (dtoContent) {
-        dtoContents[dtoName] = dtoContent;
-        console.log("✓ DTO encontrado:", dtoName);
-      } else {
-        console.warn("✗ DTO no encontrado:", dtoName);
-      }
+      if (dtoContent) dtoContents[dtoName] = dtoContent;
+      else console.warn("✗ DTO no encontrado:", dtoName);
     }
 
-    const collections: HttpCollection[] =
+    // --- Generar todas las colecciones ---
+    let allCollections: HttpCollection[] =
       HttpTesterGenerator.generateCollectionsFromController(
-        controllerCode,
+        fullCode,
         baseUrl,
         dtoContents
       );
+    let finalCollections: HttpCollection[] = allCollections;
 
-    if (collections.length === 0) {
-      vscode.window.showWarningMessage(
-        "No se detectaron endpoints con @ApiOperation."
-      );
-      return;
+    // --- Filtrado si hay selección ---
+    if (hasSelection) {
+      const routeRegex =
+        /@(Get|Post|Put|Delete|Patch|Options|Head)\(['"]?([^'")]+)['"]?\)\s*[\r\n\s]*?(?:async\s+)?(\w+)\s*\(/gi;
+
+      const matches = Array.from(selectedText.matchAll(routeRegex));
+      if (matches.length > 0) {
+        const selectedFunctionNames = matches.map((m) => m[3]);
+        finalCollections = allCollections.filter((c) =>
+          selectedFunctionNames.some((fn) => c.name.includes(fn))
+        );
+      }
     }
 
-    HttpTesterPanel.createOrShow(context.extensionUri, context);
-
-    setTimeout(() => {
-      HttpTesterPanel.currentPanel?.loadCollections(collections);
-      vscode.window.showInformationMessage(
-        `✅ ${collections.length} colección(es) generada(s).`
+    if (finalCollections.length === 0) {
+      return vscode.window.showWarningMessage(
+        hasSelection
+          ? "No se pudo generar ninguna colección para la selección. Asegúrate de incluir métodos con decoradores de ruta (@Get, @Post, etc.)."
+          : "No se detectaron endpoints en este controlador."
       );
-    }, 300);
+    }
+
+    const panel = HttpTesterPanel.createOrShow(context.extensionUri, context);
+    setTimeout(() => {
+      panel.loadCollections(finalCollections);
+      if (finalCollections.length === 1 && hasSelection)
+        panel.loadCollection(finalCollections[0]);
+      vscode.window.showInformationMessage(
+        `✅ ${finalCollections.length} colección(es) generada(s).`
+      );
+    }, 500);
+
+    // --- Funciones auxiliares de dummy ---
+    function generateDummyFromDto(dtoSource: string): any {
+      const result: any = {};
+      const propertyRegex =
+        /(?:@\w+[^\n]*\n)*\s*(?:public|private|protected)?\s*(\w+)\s*:\s*([\w\[\]\|<>{}\s,]+)\s*;/g;
+      let match;
+      while ((match = propertyRegex.exec(dtoSource)) !== null) {
+        const name = match[1];
+        const type = match[2].trim();
+        result[name] = mapTypeToDummy(type);
+      }
+      return result;
+    }
+
+    function mapTypeToDummy(type: string): any {
+      type = type.replace(/<.*?>/g, "");
+      if (type.endsWith("[]") || type === "Array") return [];
+      if (type === "boolean") return false;
+      if (type === "string" || type === "UUID") return "";
+      if (type === "number" || type === "int" || type === "float") return 0;
+      if (type === "Date" || type === "DateString") return "";
+      if (/Dto$/i.test(type) || /^[A-Z]/.test(type)) return {};
+      return null;
+    }
   } catch (error: any) {
     vscode.window.showErrorMessage(
       `❌ Error al generar colecciones: ${error.message}`
     );
-  }
-
- function generateDummyFromDto(dtoSource: string): any {
-    const result: any = {};
-
-    // Busca propiedades:  <decorators> <type> <name>: <type>;
-    const propertyRegex =
-      /(?:@\w+[^\n]*\n)*\s*(?:public|private|protected)?\s*(\w+)\s*:\s*([\w\[\]\|<>{}]+)\s*;/g;
-
-    let match;
-
-    while ((match = propertyRegex.exec(dtoSource)) !== null) {
-      const name = match[1];
-      let type = match[2].trim();
-
-      result[name] = mapTypeToDummy(type);
-    }
-
-    return result;
-  }
-
-  /**
-   * Mapea tipo a dummy
-   */
-  function mapTypeToDummy(type: string): any {
-    // Remueve generics
-    type = type.replace(/<.*?>/g, "");
-
-    // Arrays
-    if (type.endsWith("[]") || type === "Array") {
-      return [];
-    }
-
-    // Booleanos
-    if (type === "boolean") {
-      return false;
-    }
-
-    // Strings
-    if (type === "string") {
-      return "";
-    }
-
-    // Números
-    if (type === "number" || type === "int" || type === "float") {
-      return 0;
-    }
-
-    // UUID → string
-    if (type === "UUID") {
-      return "";
-    }
-
-    // Date / DateString
-    if (type === "Date" || type === "DateString") {
-      return "";
-    }
-
-    // Objetos complejos (otros DTOs)
-    if (/Dto$/i.test(type) || /^[A-Z]/.test(type)) {
-      return {};
-    }
-
-    // fallback
-    return null;
   }
 }

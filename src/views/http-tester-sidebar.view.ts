@@ -16,8 +16,10 @@ interface SocketTesterState {
 
 export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = "httpTesterView";
+  public static instance: HttpTesterSidebarProvider | undefined;
   private _view?: vscode.WebviewView;
   private readonly _extensionUri: vscode.Uri;
+  private readonly _context: vscode.ExtensionContext;
   private readonly _generator = HttpTesterGenerator.getInstance();
   private _disposables: vscode.Disposable[] = [];
 
@@ -37,8 +39,10 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
     class: "disconnected",
   };
 
-  constructor(extensionUri: vscode.Uri) {
+  constructor(extensionUri: vscode.Uri, context: vscode.ExtensionContext) {
     this._extensionUri = extensionUri;
+    this._context = context;
+    HttpTesterSidebarProvider.instance = this;
     this.socketChannel = vscode.window.createOutputChannel("Socket Tester Log");
   }
 
@@ -57,6 +61,21 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
     this._setWebviewMessageListener(webviewView.webview);
+
+    // Load collections initially
+    this.refreshCollections();
+  }
+
+  public refreshCollections() {
+    const collections = this._loadGlobalCollections();
+    this.loadCollections(collections);
+  }
+
+  private _loadGlobalCollections(): HttpCollection[] {
+    return this._context.globalState.get<HttpCollection[]>(
+      "httpTester.collections",
+      []
+    );
   }
 
   public loadCollections(collections: HttpCollection[]) {
@@ -241,37 +260,42 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
           if (msg.command === "sendRequest") {
             // Abrir el HTTP Tester Panel en el editor
             const { HttpTesterPanel } = require("./http-tester.view");
-            HttpTesterPanel.createOrShow(this._extensionUri);
+            const panel = HttpTesterPanel.createOrShow(
+              this._extensionUri,
+              this._context
+            );
 
             // Enviar la petición al panel del editor
             setTimeout(() => {
-              if (HttpTesterPanel.currentPanel) {
-                HttpTesterPanel.currentPanel._panel.webview.postMessage({
-                  command: "loadRequest",
-                  request: msg.request,
-                });
-              }
-            }, 500);
+              panel._panel.webview.postMessage({
+                command: "loadRequest",
+                request: msg.request,
+              });
+            }, 1000);
           } else if (msg.command === "openInEditor") {
             // Abrir colección en el editor
             const { HttpTesterPanel } = require("./http-tester.view");
-            HttpTesterPanel.createOrShow(this._extensionUri);
+            const panel = HttpTesterPanel.createOrShow(
+              this._extensionUri,
+              this._context
+            );
 
             // Cargar la colección en el panel del editor
             setTimeout(() => {
-              if (HttpTesterPanel.currentPanel && msg.collection) {
-                HttpTesterPanel.currentPanel._panel.webview.postMessage({
-                  command: "loadCollection",
-                  collection: msg.collection,
-                });
-              }
-            }, 500);
+              // Send only the single collection to load into the form
+              panel._panel.webview.postMessage({
+                command: "loadCollection",
+                collection: msg.collection,
+              });
+            }, 1000);
           } else if (msg.command === "importJson") {
             // Handle JSON import
             await this._handleImportJson(msg.type);
           } else if (msg.command === "exportJson") {
             // Handle JSON export
             await this._handleExportJson(msg.collections);
+          } else if (msg.command === "ready") {
+            this.refreshCollections();
           } else if (msg.command.startsWith("socket")) {
             this._handleSocketMessage(msg);
           }
@@ -341,14 +365,35 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
           return;
         }
 
-        // Send to webview
-        if (this._view) {
-          this._view.webview.postMessage({
-            command: "importedCollections",
-            collections: filteredCollections,
-            type: type,
-          });
-        }
+        // --- PERSISTENCE UPDATE ---
+        // Get existing Global State collections
+        const currentCollections = this._loadGlobalCollections();
+
+        // Merge new collections (avoid duplicates by name+type)
+        filteredCollections.forEach((newCol) => {
+          const existsIndex = currentCollections.findIndex(
+            (c) => c.name === newCol.name && c.type === newCol.type
+          );
+          if (existsIndex !== -1) {
+            // Update existing? Or skip? Let's update/overwrite
+            currentCollections[existsIndex] = newCol;
+          } else {
+            currentCollections.push(newCol);
+          }
+        });
+
+        // Save back to Global State
+        await this._context.globalState.update(
+          "httpTester.collections",
+          currentCollections
+        );
+
+        // Refresh UI
+        this.refreshCollections();
+
+        vscode.window.showInformationMessage(
+          `✅ ${filteredCollections.length} colección(es) importada(s) y guardada(s).`
+        );
       } catch (parseError) {
         vscode.window.showErrorMessage(
           `Error al parsear el archivo JSON: ${
