@@ -39,11 +39,17 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   treeView.onDidChangeCheckboxState((e) => {
+    const changedItems = new Set(e.items.map(([item]) => item));
+
     e.items.forEach(([item, state]) => {
       if (item instanceof EntityItem) {
-        entityTreeProvider.setChecked(item, state);
+        if (!item.parent || !changedItems.has(item.parent)) {
+          entityTreeProvider.setChecked(item.filePath, state);
+        }
       }
     });
+
+    entityTreeProvider.refresh();
   });
 
   context.subscriptions.push(treeView);
@@ -86,7 +92,8 @@ export function activate(context: vscode.ExtensionContext) {
           entityNames[0], // using first as 'root' for naming purpose mainly
           vscode.workspace.rootPath || "",
           context,
-          entityNames // pass the list!
+          entityNames, // pass the list!
+          true // strict mode: only show selected entities
         );
       }
     )

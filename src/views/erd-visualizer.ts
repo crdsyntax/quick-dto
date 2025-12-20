@@ -47,7 +47,8 @@ export class EntityVisualizer {
     entityName: string,
     rootPath: string,
     context: vscode.ExtensionContext,
-    entityList?: string[]
+    entityList?: string[],
+    strict: boolean = false
   ) {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
@@ -56,7 +57,7 @@ export class EntityVisualizer {
     // Generate ERD data
     let erdData;
     if (entityList && entityList.length > 0) {
-      erdData = await generateErdDataForEntities(rootPath, entityList);
+      erdData = await generateErdDataForEntities(rootPath, entityList, strict);
     } else {
       erdData = await generateErdData(rootPath, entityName);
     }
@@ -214,6 +215,12 @@ export class EntityVisualizer {
 
                 .field-relation {
                     fill: var(--vscode-terminal-ansiBlue);
+                    cursor: pointer;
+                    text-decoration: underline dotted;
+                }
+                
+                .field-relation:hover {
+                    fill: var(--vscode-focusBorder);
                 }
                 
                 .relation-path {
@@ -338,6 +345,19 @@ export class EntityVisualizer {
                         render();
                     }
 
+                    function focusNode(nodeId) {
+                        const targetNode = nodes.find(n => n.id === nodeId);
+                        if (!targetNode) return;
+
+                        const scale = 1.2;
+                        const x = -targetNode.x * scale + width / 2 - (targetNode.width / 2) * scale;
+                        const y = -targetNode.y * scale + height / 2 - (targetNode.height / 2) * scale;
+                        
+                        svg.transition()
+                            .duration(750)
+                            .call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(scale));
+                    }
+
                     function render() {
                         // --- LINKS ---
                         const linkSelection = linkGroup.selectAll("g")
@@ -446,11 +466,23 @@ export class EntityVisualizer {
 
                                     const text = icon + field.name + nullable + ": " + typeDisplay;
                                     
-                                    node.append("text")
+                                    const fieldText = node.append("text")
                                         .attr("class", className)
                                         .attr("x", 10)
                                         .attr("y", y)
                                         .text(text);
+
+                                    if (field.isRelation) {
+                                        // Find which relation this field belongs to
+                                        const relation = d.data.relations.find(r => r.propertyName === field.name);
+                                        if (relation) {
+                                            fieldText.on("click", function(e) {
+                                                e.stopPropagation();
+                                                focusNode(relation.targetEntity);
+                                            });
+                                            fieldText.append("title").text("Click to focus " + relation.targetEntity);
+                                        }
+                                    }
                                 });
                             }
                         });

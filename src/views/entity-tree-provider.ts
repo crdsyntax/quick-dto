@@ -25,13 +25,12 @@ export class EntityTreeDataProvider
     this.refresh();
   }
 
-  setChecked(item: EntityItem, state: vscode.TreeItemCheckboxState) {
+  setChecked(filePath: string, state: vscode.TreeItemCheckboxState) {
     if (state === vscode.TreeItemCheckboxState.Checked) {
-      this.checkedItems.add(item.filePath);
+      this.checkedItems.add(filePath);
     } else {
-      this.checkedItems.delete(item.filePath);
+      this.checkedItems.delete(filePath);
     }
-    this.refresh();
   }
 
   getCheckedItems(): string[] {
@@ -60,6 +59,10 @@ export class EntityTreeDataProvider
 
     if (element instanceof EntityFolderItem) {
       return this.getEntitiesInFolder(element.folderPath);
+    }
+
+    if (element instanceof EntityItem) {
+      return this.getRelatedEntities(element);
     }
 
     return [];
@@ -103,10 +106,14 @@ export class EntityTreeDataProvider
         ? path.basename(file.fsPath, ".entity.ts")
         : path.basename(file.fsPath, ".schema.ts");
 
+      const hasRels = this.hasRelations(file.fsPath);
+
       return new EntityItem(
         base,
         file.fsPath,
-        vscode.TreeItemCollapsibleState.None
+        hasRels
+          ? vscode.TreeItemCollapsibleState.Collapsed
+          : vscode.TreeItemCollapsibleState.None
       );
     });
 
@@ -115,6 +122,140 @@ export class EntityTreeDataProvider
     return items.filter((i) =>
       i.label.toLowerCase().includes(this.filterQuery)
     );
+  }
+
+  private hasRelations(filePath: string): boolean {
+    try {
+      if (!fs.existsSync(filePath)) return false;
+      const content = fs.readFileSync(filePath, "utf8");
+      return (
+        /@(ManyToOne|OneToMany|OneToOne|ManyToMany)/.test(content) ||
+        /ref:\s*['"]\w+['"]/.test(content)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private async getRelatedEntities(item: EntityItem): Promise<EntityItem[]> {
+    try {
+      const content = fs.readFileSync(item.filePath, "utf8");
+      const relations: {
+        type: string;
+        targetEntity: string;
+        propertyName: string;
+      }[] = [];
+
+      // TypeORM relations: @ManyToOne(() => User, ...)
+      const relRegex =
+        /@(ManyToOne|OneToMany|OneToOne|ManyToMany)\s*\(\s*\(\s*\)\s*=>\s*([\w]+)/g;
+      let match;
+      while ((match = relRegex.exec(content)) !== null) {
+        const type = match[1];
+        const targetEntity = match[2];
+
+        const nextLines = content.substring(
+          match.index + match[0].length,
+          match.index + match[0].length + 100
+        );
+        const propertyNameMatch = nextLines.match(/^\s*\)?\s*(\w+)\s*[:?]/);
+        const propertyName = propertyNameMatch ? propertyNameMatch[1] : "";
+
+        if (
+          targetEntity &&
+          !relations.some(
+            (r) =>
+              r.targetEntity === targetEntity && r.propertyName === propertyName
+          )
+        ) {
+          relations.push({ type, targetEntity, propertyName });
+        }
+      }
+
+      // Mongoose: ref: 'User'
+      const mongooseRegex = /ref:\s*['"](\w+)['"]/g;
+      while ((match = mongooseRegex.exec(content)) !== null) {
+        const targetEntity = match[1];
+        if (
+          targetEntity &&
+          !relations.some((r) => r.targetEntity === targetEntity)
+        ) {
+          relations.push({ type: "Ref", targetEntity, propertyName: "" });
+        }
+      }
+
+      const relatedItems: EntityItem[] = [];
+      for (const rel of relations) {
+        let filePath = await this.findEntityFile(
+          rel.targetEntity,
+          item.filePath,
+          content
+        );
+
+        if (filePath) {
+          const label = rel.propertyName
+            ? `${rel.propertyName}: ${rel.targetEntity}`
+            : rel.targetEntity;
+          const hasRels = this.hasRelations(filePath);
+          const relatedItem = new EntityItem(
+            label,
+            filePath,
+            hasRels
+              ? vscode.TreeItemCollapsibleState.Collapsed
+              : vscode.TreeItemCollapsibleState.None,
+            item
+          );
+          relatedItem.description = rel.type;
+          relatedItems.push(relatedItem);
+        }
+      }
+      return relatedItems;
+    } catch (err) {
+      return [];
+    }
+  }
+
+  private async findEntityFile(
+    targetEntity: string,
+    sourceFilePath: string,
+    content: string
+  ): Promise<string | undefined> {
+    const importRegex = new RegExp(
+      `import\\s+{[^}]*${targetEntity}[^}]*}\\s+from\\s+['"](.*)['"]`,
+      "i"
+    );
+    const match = content.match(importRegex);
+    if (match) {
+      const importPath = match[1];
+      if (importPath.startsWith(".")) {
+        const absolutePath = path.resolve(
+          path.dirname(sourceFilePath),
+          importPath
+        );
+        const extensions = [".ts", ".entity.ts", ".schema.ts", "/index.ts", ""];
+        for (const ext of extensions) {
+          const fullPath = absolutePath + ext;
+          if (fs.existsSync(fullPath) && fs.lstatSync(fullPath).isFile()) {
+            return fullPath;
+          }
+        }
+      }
+    }
+
+    const patterns = [
+      `**/src/**/${targetEntity.toLowerCase()}.entity.ts`,
+      `**/src/**/${targetEntity.toLowerCase()}.schema.ts`,
+      `**/src/**/${targetEntity}.entity.ts`,
+      `**/src/**/${targetEntity}.schema.ts`,
+    ];
+
+    for (const pattern of patterns) {
+      const files = await vscode.workspace.findFiles(pattern);
+      if (files.length > 0) {
+        return files[0].fsPath;
+      }
+    }
+    return undefined;
   }
 }
 
@@ -133,7 +274,8 @@ export class EntityItem extends vscode.TreeItem {
   constructor(
     public readonly label: string,
     public readonly filePath: string,
-    collapsibleState: vscode.TreeItemCollapsibleState
+    collapsibleState: vscode.TreeItemCollapsibleState,
+    public readonly parent?: EntityItem
   ) {
     super(label, collapsibleState);
     this.description = path.basename(filePath);

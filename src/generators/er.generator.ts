@@ -154,7 +154,8 @@ export async function generateErdData(
 
 export async function generateErdDataForEntities(
   rootPath: string,
-  entityNames: string[]
+  entityNames: string[],
+  strict = false
 ): Promise<ErdDiagramData> {
   const ENTITIES_PATH = rootPath + "/src/**/*.entity.ts";
 
@@ -259,16 +260,18 @@ export async function generateErdDataForEntities(
     }
   }
 
-  // Filter requested entities AND their direct relations
+  // Filter requested entities AND their direct relations (unless strict)
   const subEntities: Record<string, EntityData> = {};
   const entitiesToInclude = new Set<string>(entityNames);
 
-  for (const name of entityNames) {
-    const entity = entities[name];
-    if (entity) {
-      for (const rel of entity.relations) {
-        if (entities[rel.targetEntity]) {
-          entitiesToInclude.add(rel.targetEntity);
+  if (!strict) {
+    for (const name of entityNames) {
+      const entity = entities[name];
+      if (entity) {
+        for (const rel of entity.relations) {
+          if (entities[rel.targetEntity]) {
+            entitiesToInclude.add(rel.targetEntity);
+          }
         }
       }
     }
