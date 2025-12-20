@@ -26,9 +26,87 @@ export class DtoSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private getHtmlForWebview(webview: vscode.Webview) {
-    const snippet = `  @IsOptional()\n  @IsString()\n  @ApiPropertyOptional({\n    description: \"Example code propert DTO \",\n    example: \"example propert\",\n  })\n  proper?: string;\n`;
+    const classValidator = [
+      "IsDefined()",
+      "IsOptional()",
+      "IsString()",
+      "IsNumber()",
+      "IsInt()",
+      "IsBoolean()",
+      "IsDate()",
+      "IsArray()",
+      "ValidateNested()",
+      "IsEnum()",
+      "Length(1, 255)",
+      "MinLength(1)",
+      "MaxLength(255)",
+      "Min(0)",
+      "Max(100)",
+      "Matches(/regex/)",
+      "IsEmail()",
+      "IsUUID()",
+      "IsPhoneNumber(null)",
+      "IsUrl()",
+      "IsNotEmpty()",
+      "IsPositive()",
+      "IsNegative()",
+      "IsEmpty()",
+      "IsIn([])",
+      "IsNotIn([])"
+    ];
 
-    // Simple sidebar UI with draggable item
+    const swagger = [
+      "ApiProperty({ description: \"Description\", example: \"example\" })",
+      "ApiPropertyOptional({ description: \"Description\", example: \"example\" })",
+      "ApiHideProperty()"
+    ];
+
+    const classTransformer = [
+      "Expose()",
+      "Exclude()",
+      "Type(() => Type)",
+      "Transform((value) => value)"
+    ];
+
+    const propertyTemplates = [
+      {
+        name: 'string optional',
+        snippet: `@IsOptional()\n@IsString()\n@ApiPropertyOptional({ description: \"Example string\", example: \"text\" })\nmyProp?: string;\n`
+      },
+      {
+        name: 'string required',
+        snippet: `@IsString()\n@ApiProperty({ description: \"Example string\", example: \"text\" })\nmyProp: string;\n`
+      },
+      {
+        name: 'number optional',
+        snippet: `@IsOptional()\n@IsNumber()\n@ApiPropertyOptional({ description: \"Example number\", example: 1 })\nmyProp?: number;\n`
+      },
+      {
+        name: 'boolean optional',
+        snippet: `@IsOptional()\n@IsBoolean()\n@ApiPropertyOptional({ description: \"Example boolean\", example: true })\nmyProp?: boolean;\n`
+      },
+      {
+        name: 'date optional',
+        snippet: `@IsOptional()\n@IsDate()\n@ApiPropertyOptional({ description: \"Example date\", example: \"2020-01-01\" })\nmyProp?: Date;\n`
+      },
+      {
+        name: 'array of strings',
+        snippet: `@IsOptional()\n@IsArray()\n@IsString({ each: true })\n@ApiPropertyOptional({ isArray: true, example: [\"a\", \"b\"] })\nmyProp?: string[];\n`
+      },
+      {
+        name: 'nested object',
+        snippet: `@ValidateNested()\n@Type(() => NestedDto)\n@ApiProperty({ type: () => NestedDto })\nmyProp: NestedDto;\n`
+      }
+    ];
+
+    function makeItemHtml(name, snippet) {
+      return `<div class=\"item\" draggable=\"true\" data-snippet=\"${snippet.replace(/\"/g, '&quot;')}\">${name}</div>`;
+    }
+
+    const validatorHtml = classValidator.map((d) => makeItemHtml(d, `@${d}\n`)).join('');
+    const swaggerHtml = swagger.map((d) => makeItemHtml(d, `@${d}\n`)).join('');
+    const transformerHtml = classTransformer.map((d) => makeItemHtml(d, `@${d}\n`)).join('');
+
     return `<!doctype html>
 <html lang="en">
 <head>
@@ -37,8 +115,11 @@ export class DtoSidebarProvider implements vscode.WebviewViewProvider {
   <style>
     body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding:8px }
     .section { margin-bottom: 12px }
-    .item { padding:6px; border-radius:4px; background:var(--vscode-sideBar-background); cursor:grab }
+    .item { padding:6px; border-radius:4px; background:var(--vscode-sideBar-background); cursor:grab; margin:4px 0 }
     .item:active { cursor:grabbing }
+    .columns { display:flex; gap:12px }
+    .col { flex:1; min-width:120px }
+    .col h4 { margin:4px 0 }
     button { margin-top:8px }
     .sub { padding-left:8px; margin-top:6px }
   </style>
@@ -46,27 +127,80 @@ export class DtoSidebarProvider implements vscode.WebviewViewProvider {
 <body>
   <div class="section">
     <h3>DTO Properties</h3>
-    <div class="sub">
-      <div class="item" draggable="true" id="properItem">proper?: string;</div>
-      <button id="insertBtn">Insert into active editor</button>
+    <div class="columns">
+      <div class="col">
+        <h4>class-validator</h4>
+        ${validatorHtml}
+      </div>
+      <div class="col">
+        <h4>@nestjs/swagger</h4>
+        ${swaggerHtml}
+      </div>
+      <div class="col">
+        <h4>class-transformer</h4>
+        ${transformerHtml}
+      </div>
+      <div class="col">
+        <h4>Property Snippets</h4>
+        ${propertyTemplates.map(p => makeItemHtml(p.name, p.snippet)).join('')}
+      </div>
+    </div>
+    <div style="margin-top:8px">
+      <button id="insertBtn">Insert selected into active editor</button>
     </div>
   </div>
 
   <script>
     const vscode = acquireVsCodeApi();
-    const snippet = ${JSON.stringify(snippet)};
-    const imports = {
-      classValidator: ["IsOptional","IsString"],
-      swagger: ["ApiPropertyOptional"]
-    };
+    let lastSnippet = null;
 
-    const item = document.getElementById('properItem');
-    item.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', snippet);
+    document.querySelectorAll('.item').forEach(it => {
+      it.addEventListener('click', () => {
+        document.querySelectorAll('.item').forEach(i => i.style.outline = '');
+        it.style.outline = '2px solid var(--vscode-focusBorder)';
+        lastSnippet = it.getAttribute('data-snippet');
+      });
+      it.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', it.getAttribute('data-snippet'));
+      });
     });
 
     document.getElementById('insertBtn').addEventListener('click', () => {
-      vscode.postMessage({ command: 'insertSnippet', snippet, imports });
+      if (!lastSnippet) {
+        vscode.postMessage({ command: 'showWarning', text: 'Seleccione un decorador o plantilla para insertar.' });
+        return;
+      }
+
+      // determine imports required by scanning snippet (collect all decorator names)
+      const imports = { classValidator: [], swagger: [], transformer: [] };
+      const s = lastSnippet;
+      // find all @DecoratorName occurrences
+      const matches = Array.from(s.matchAll(/@([A-Za-z0-9_]+)/g)).map(m => m[1]);
+      for (const name of matches) {
+        if (/^Is|^Validate|^Length|^Min|^Max|^Matches|^Is/.test(name)) {
+          imports.classValidator.push(name);
+        }
+        if (/^Api/.test(name)) {
+          imports.swagger.push(name);
+        }
+        if (/^Expose$|^Exclude$|^Type$|^Transform$/.test(name)) {
+          imports.transformer.push(name);
+        }
+      }
+
+      // dedupe
+      imports.classValidator = [...new Set(imports.classValidator)];
+      imports.swagger = [...new Set(imports.swagger)];
+      imports.transformer = [...new Set(imports.transformer)];
+
+      vscode.postMessage({ command: 'insertSnippet', snippet: lastSnippet, imports });
+    });
+
+    window.addEventListener('message', event => {
+      const msg = event.data;
+      if (msg.command === 'setSnippet') {
+        lastSnippet = msg.snippet;
+      }
     });
   </script>
 </body>
@@ -75,7 +209,7 @@ export class DtoSidebarProvider implements vscode.WebviewViewProvider {
 
   private async insertSnippetAndEnsureImports(
     snippet: string,
-    imports: { classValidator: string[]; swagger: string[] }
+    imports: { classValidator: string[]; swagger: string[]; transformer?: string[] }
   ) {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
@@ -124,6 +258,24 @@ export class DtoSidebarProvider implements vscode.WebviewViewProvider {
       }
     } else {
       edit.insert(doc.uri, new vscode.Position(0, 0), `import { ${imports.swagger.join(', ')} } from '@nestjs/swagger';\n`);
+    }
+
+    // class-transformer
+    if (imports.transformer && imports.transformer.length > 0) {
+      const ctRegex = /import\s+\{([\s\S]*?)\}\s+from\s+['"]class-transformer['"];?/;
+      const matchCt = text.match(ctRegex);
+      if (matchCt) {
+        const existing = matchCt[1];
+        const missing = imports.transformer.filter((i) => !new RegExp('\\b' + i + '\\b').test(existing));
+        if (missing.length > 0) {
+          const newImport = existing.trim() + (existing.trim() ? ', ' : '') + missing.join(', ');
+          const replaceRange = new vscode.Range(doc.positionAt(matchCt.index || 0), doc.positionAt((matchCt.index || 0) + matchCt[0].length));
+          const newText = `import { ${newImport} } from 'class-transformer';`;
+          edit.replace(doc.uri, replaceRange, newText);
+        }
+      } else {
+        edit.insert(doc.uri, new vscode.Position(0, 0), `import { ${imports.transformer.join(', ')} } from 'class-transformer';\n`);
+      }
     }
 
     await vscode.workspace.applyEdit(edit);
