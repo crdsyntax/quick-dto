@@ -44,6 +44,12 @@
           "title": "HTTP Tester",
           "icon": "images/socket.svg"
         }
+        ,
+        {
+          "id": "dto-properties-panel",
+          "title": "DTO Properties",
+          "icon": "images/socket.svg"
+        }
       ]
     },
     "views": {
@@ -52,6 +58,14 @@
           "id": "nest-tools.entityView",
           "name": "Entities",
           "icon": "images/entity.svg"
+        }
+      ],
+      "dto-properties-panel": [
+        {
+          "id": "nest-tools.dtoPropertiesView",
+          "name": "DTO Properties",
+          "type": "webview",
+          "icon": "images/socket.svg"
         }
       ],
       "socketTesterContainer": [

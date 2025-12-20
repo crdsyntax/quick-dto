@@ -20,6 +20,7 @@ import {
 } from "./views/entity-tree-provider";
 import { EntityVisualizer } from "./views/erd-visualizer";
 import { SocketTesterViewProvider } from "./views/socketView";
+import { DtoSidebarProvider } from "./views/dto-sidebar.view";
 import {
   closeHttpTesterCommand,
   openHttpTesterCommand,
@@ -104,6 +105,14 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.registerWebviewViewProvider(
       SocketTesterViewProvider.viewId,
       socketProvider
+    )
+  );
+
+  const dtoProvider = new DtoSidebarProvider(context.extensionUri);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      DtoSidebarProvider.viewId,
+      dtoProvider
     )
   );
 
