@@ -27,6 +27,7 @@ import {
 } from "./commands/http-tester.command";
 import { HttpTesterSidebarProvider } from "./views/http-tester-sidebar.view";
 import { addLoggerDebugCommand } from "./commands/logger.command";
+import { createAutoCommitService } from "./commands/auto-commit.command";
 import { generateCollectionsFromControllerCommand } from "./commands/generate-collection.command";
 import { HttpTesterPanel } from "./views/http-tester.view";
 
@@ -276,6 +277,18 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.commands.executeCommand("nest-tools.completeReturnType");
     })
   );
+
+  // Auto-commit service moved to commands/auto-commit.command.ts
+  const autoCommitService = createAutoCommitService(context);
+  context.subscriptions.push(autoCommitService);
+  try {
+    const acEnabled = context.globalState.get("autoCommitEnabled");
+    if (acEnabled) {
+      vscode.window.showInformationMessage("Auto-commit is enabled.");
+    }
+  } catch (err) {
+    // ignore
+  }
 
   vscode.window.showInformationMessage("Backend tools active!");
 }

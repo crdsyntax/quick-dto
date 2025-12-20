@@ -233,6 +233,22 @@
         "title": "API Tester: Focus",
         "category": "NestJS Tools"
       }
+      ,
+      {
+        "command": "nest-tools.enableAutoCommit",
+        "title": "Enable Auto-Commit",
+        "category": "Git"
+      },
+      {
+        "command": "nest-tools.disableAutoCommit",
+        "title": "Disable Auto-Commit",
+        "category": "Git"
+      },
+      {
+        "command": "nest-tools.toggleAutoCommit",
+        "title": "Toggle Auto-Commit",
+        "category": "Git"
+      }
     ],
     "menus": {
       "view/title": [
@@ -396,6 +412,13 @@
         "command": "nest-tools.controllerByFunction",
         "key": "ctrl+shift+y",
         "mac": "cmd+shift+t",
+        "when": "editorTextFocus"
+      }
+      ,
+      {
+        "command": "nest-tools.toggleAutoCommit",
+        "key": "ctrl+alt+a",
+        "mac": "cmd+alt+a",
         "when": "editorTextFocus"
       }
     ]
