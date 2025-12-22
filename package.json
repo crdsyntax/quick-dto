@@ -48,7 +48,7 @@
         {
           "id": "dto-properties-panel",
           "title": "DTO Properties",
-          "icon": "images/socket.svg"
+          "icon": "images/sequence.svg"
         }
       ]
     },

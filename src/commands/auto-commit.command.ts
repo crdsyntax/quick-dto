@@ -25,43 +25,55 @@ export class AutoCommitService implements vscode.Disposable {
     );
 
     this.disposables.push(
-      vscode.commands.registerCommand("nest-tools.enableAutoCommit", async () => {
-        this.enabled = true;
-        await this.context.globalState.update("autoCommitEnabled", true);
-        vscode.window.showInformationMessage("Auto-commit enabled.");
-        try {
-          await this.initRepoMonitoring();
-          await this.checkAllReposForThreshold();
-        } catch (err) {
-          // silent
-        }
-      })
-    );
-
-    this.disposables.push(
-      vscode.commands.registerCommand("nest-tools.disableAutoCommit", async () => {
-        this.enabled = false;
-        await this.context.globalState.update("autoCommitEnabled", false);
-        vscode.window.showInformationMessage("Auto-commit disabled.");
-      })
-    );
-
-    this.disposables.push(
-      vscode.commands.registerCommand("nest-tools.toggleAutoCommit", async () => {
-        this.enabled = !this.enabled;
-        await this.context.globalState.update("autoCommitEnabled", this.enabled);
-        vscode.window.showInformationMessage(
-          `Auto-commit ${this.enabled ? "enabled" : "disabled"}.`
-        );
-        try {
-          if (this.enabled) {
+      vscode.commands.registerCommand(
+        "nest-tools.enableAutoCommit",
+        async () => {
+          this.enabled = true;
+          await this.context.globalState.update("autoCommitEnabled", true);
+          vscode.window.showInformationMessage("Auto-commit enabled.");
+          try {
             await this.initRepoMonitoring();
             await this.checkAllReposForThreshold();
+          } catch (err) {
+            // silent
           }
-        } catch (err) {
-          // silent
         }
-      })
+      )
+    );
+
+    this.disposables.push(
+      vscode.commands.registerCommand(
+        "nest-tools.disableAutoCommit",
+        async () => {
+          this.enabled = false;
+          await this.context.globalState.update("autoCommitEnabled", false);
+          vscode.window.showInformationMessage("Auto-commit disabled.");
+        }
+      )
+    );
+
+    this.disposables.push(
+      vscode.commands.registerCommand(
+        "nest-tools.toggleAutoCommit",
+        async () => {
+          this.enabled = !this.enabled;
+          await this.context.globalState.update(
+            "autoCommitEnabled",
+            this.enabled
+          );
+          vscode.window.showInformationMessage(
+            `Auto-commit ${this.enabled ? "enabled" : "disabled"}.`
+          );
+          try {
+            if (this.enabled) {
+              await this.initRepoMonitoring();
+              await this.checkAllReposForThreshold();
+            }
+          } catch (err) {
+            // silent
+          }
+        }
+      )
     );
   }
 
@@ -70,6 +82,7 @@ export class AutoCommitService implements vscode.Disposable {
   }
 
   private repoStagedCount: Map<string, number> = new Map();
+  private repoWorkingCount: Map<string, number> = new Map();
 
   private async initRepoMonitoring() {
     if ((this as any)._monitoringInitialized) return;
@@ -80,7 +93,14 @@ export class AutoCommitService implements vscode.Disposable {
     const addRepoListener = (repo: any) => {
       try {
         const key = repo.rootUri?.fsPath || repo.path || String(Math.random());
-        this.repoStagedCount.set(key, (repo.state.indexChanges || []).length || 0);
+        this.repoStagedCount.set(
+          key,
+          (repo.state.indexChanges || []).length || 0
+        );
+        this.repoWorkingCount.set(
+          key,
+          (repo.state.workingTreeChanges || []).length || 0
+        );
         if (repo.state && typeof repo.state.onDidChange === "function") {
           const d = repo.state.onDidChange(() => this.onRepoStateChange(repo));
           this.disposables.push(d);
@@ -88,7 +108,10 @@ export class AutoCommitService implements vscode.Disposable {
           const d = repo.onDidChange(() => this.onRepoStateChange(repo));
           this.disposables.push(d);
         } else {
-          const interval = setInterval(() => this.onRepoStateChange(repo), 1000);
+          const interval = setInterval(
+            () => this.onRepoStateChange(repo),
+            1000
+          );
           this.disposables.push({ dispose: () => clearInterval(interval) });
         }
       } catch (err) {
@@ -135,7 +158,8 @@ export class AutoCommitService implements vscode.Disposable {
       } else {
         const picks = repos.map((r) => ({ label: r.rootUri.fsPath, repo: r }));
         const sel = await vscode.window.showQuickPick(picks, {
-          placeHolder: "Multiple repositories detected — select one to check for staged files",
+          placeHolder:
+            "Multiple repositories detected — select one to check for staged files",
         });
         if (!sel) return;
         repoToCheck = sel.repo;
@@ -145,7 +169,9 @@ export class AutoCommitService implements vscode.Disposable {
       if (staged >= 3) {
         try {
           vscode.window.showInformationMessage(
-            `Repository ${repoToCheck.rootUri?.fsPath || repoToCheck.path} has ${staged} staged files — running auto-commit flow.`
+            `Repository ${
+              repoToCheck.rootUri?.fsPath || repoToCheck.path
+            } has ${staged} staged files — running auto-commit flow.`
           );
         } catch (e) {
           // ignore
@@ -161,14 +187,37 @@ export class AutoCommitService implements vscode.Disposable {
     try {
       if (!this.enabled) return;
       const key = repo.rootUri?.fsPath || repo.path || String(Math.random());
-      const prev = this.repoStagedCount.get(key) || 0;
-      const current = (repo.state.indexChanges || []).length || 0;
-      this.repoStagedCount.set(key, current);
-      // trigger only on rising edge when reaching threshold
-      if (current >= 3 && prev < 3) {
+
+      const prevStaged = this.repoStagedCount.get(key) || 0;
+      const currentStaged = (repo.state.indexChanges || []).length || 0;
+      this.repoStagedCount.set(key, currentStaged);
+
+      const prevWorking = this.repoWorkingCount.get(key) || 0;
+      const currentWorking = (repo.state.workingTreeChanges || []).length || 0;
+      this.repoWorkingCount.set(key, currentWorking);
+
+      // Auto-stage logic: if working files >= 3 and it's a rising edge
+      if (currentWorking >= 3 && prevWorking < 3) {
         try {
           vscode.window.showInformationMessage(
-            `Detected ${current} staged files in ${repo.rootUri?.fsPath || repo.path}. Starting auto-commit flow...`
+            `Detected ${currentWorking} changed files in ${
+              repo.rootUri?.fsPath || repo.path
+            }. Auto-staging...`
+          );
+        } catch (e) {}
+        await this.stageFiles(repo, currentWorking);
+        // After staging, repo state will change again and trigger onRepoStateChange
+        // where it will hit the auto-commit logic below if currentStaged >= 3
+        return;
+      }
+
+      // trigger only on rising edge when reaching threshold for commit
+      if (currentStaged >= 3 && prevStaged < 3) {
+        try {
+          vscode.window.showInformationMessage(
+            `Detected ${currentStaged} staged files in ${
+              repo.rootUri?.fsPath || repo.path
+            }. Starting auto-commit flow...`
           );
         } catch (e) {
           // ignore
@@ -235,7 +284,9 @@ export class AutoCommitService implements vscode.Disposable {
         ignoreFocusOut: true,
       });
       if (!input || input.trim().length === 0) {
-        vscode.window.showWarningMessage("Auto-commit aborted: branch creation cancelled.");
+        vscode.window.showWarningMessage(
+          "Auto-commit aborted: branch creation cancelled."
+        );
         return false;
       }
       const newName = input.trim();
@@ -259,7 +310,9 @@ export class AutoCommitService implements vscode.Disposable {
     try {
       const working: any[] = repo.state.workingTreeChanges || [];
       if (!working || working.length === 0) return false;
-      const toStage = working.slice(0, count).map((c: any) => c.uri || c.resourceUri || c);
+      const toStage = working
+        .slice(0, count)
+        .map((c: any) => c.uri || c.resourceUri || c);
       if (toStage.length === 0) return false;
       try {
         // repo.add expects Uri[]
@@ -278,7 +331,9 @@ export class AutoCommitService implements vscode.Disposable {
           }
         }
         try {
-          vscode.window.showInformationMessage(`Staged ${toStage.length} file(s) for auto-commit.`);
+          vscode.window.showInformationMessage(
+            `Staged ${toStage.length} file(s) for auto-commit.`
+          );
         } catch (e) {
           // ignore
         }

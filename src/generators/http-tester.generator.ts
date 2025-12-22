@@ -85,14 +85,19 @@ function getDefaultValue(typeName: string, propertyName?: string): any {
 function parseDtoProperties(dtoContent: string): Record<string, any> {
   const body: Record<string, any> = {};
 
-  // Regex mejorado: Busca propiedades con sus decoradores
-  // Captura todo el bloque desde @ApiProperty hasta la declaración de la propiedad
-  const propertyBlockRegex =
-    /(@ApiProperty\([^)]*\)[\s\S]*?)?(\w+)\??:\s*(\w+)(?:\[\])?\s*;/g;
+  // Regex mejorado: captura decoradores previos (incluye @ApiProperty y @ApiPropertyOptional),
+  // el nombre de la propiedad y el tipo (soporta tipos más complejos y arrays)
+  // Captura todos los decoradores (cada uno puede o no tener paréntesis) y la declaración de propiedad
+  const propertyBlockRegex = /((?:@\w+(?:\([\s\S]*?\))?\s*)*)\s*(?:public|private|protected)?\s*(\w+)\??\s*:\s*([^;]+)\s*;/g;
 
   let match;
   while ((match = propertyBlockRegex.exec(dtoContent)) !== null) {
-    const [fullMatch, apiPropertyDecorator, propertyName, propertyType] = match;
+    const [fullMatch, decoratorsBlock, propertyName, propertyTypeRaw] = match;
+    const propertyType = propertyTypeRaw.trim();
+
+    // Encontrar si dentro de los decoradores existe @ApiProperty o @ApiPropertyOptional
+    const apiPropertyMatch = /@ApiProperty(?:Optional)?\([\s\S]*?}\s*\)/s.exec(decoratorsBlock || "");
+    const apiPropertyDecorator = apiPropertyMatch ? apiPropertyMatch[0] : null;
 
     let value: any = null;
 
@@ -114,33 +119,24 @@ function parseDtoProperties(dtoContent: string): Record<string, any> {
       }
     }
 
-    // 2. Si no hay ejemplo, buscar en el código anterior por decoradores de class-validator
+    // 2. Si no hay ejemplo, inferir por los decoradores (declarados justo antes de la propiedad)
     if (value === null) {
-      const prevCode = dtoContent.substring(
-        Math.max(0, match.index - 300),
-        match.index
-      );
+      const decorators = decoratorsBlock || "";
+      let inferredType = propertyType;
 
-      let finalType = propertyType;
+      if (/\bIsBoolean\b/.test(decorators)) inferredType = 'boolean';
+      else if (/\bIsDateString\b|\bIsDate\b/.test(decorators)) inferredType = 'date';
+      else if (/\bIsEmail\b/.test(decorators)) inferredType = 'email';
+      else if (/\bIsArray\b/.test(decorators)) inferredType = 'array';
+      else if (/\bIsInt\b|\bIsNumber\b|\bIsNumberString\b/.test(decorators)) inferredType = 'number';
+      else if (/@Type\s*\(\s*\(\s*\)\s*=>\s*Number\s*\)/.test(decorators)) inferredType = 'number';
 
-      if (prevCode.includes("@IsBoolean()")) {
-        finalType = "boolean";
-      } else if (prevCode.includes("@IsString()")) {
-        finalType = "string";
-      } else if (prevCode.includes("@IsNumber()")) {
-        finalType = "number";
-      } else if (prevCode.includes("@IsDate()")) {
-        finalType = "date";
-      } else if (prevCode.includes("@IsEmail()")) {
-        finalType = "email";
-      } else if (prevCode.includes("@IsArray()")) {
-        finalType = "array";
+      // Si el tipo es array o contiene Array<>, devolver arreglo vacío
+      if (/\[\]$/.test(propertyType) || /Array<|\barray\b/i.test(propertyType) || inferredType === 'array') {
+        value = [];
+      } else {
+        value = getDefaultValue(inferredType, propertyName);
       }
-
-      value = getDefaultValue(
-        finalType !== propertyType ? finalType : propertyType,
-        propertyName
-      );
     }
 
     body[propertyName] = value;
@@ -165,14 +161,14 @@ export class HttpTesterGenerator {
     );
     const basePath = controllerMatch ? controllerMatch[1] : "default";
 
-    const endpointRegex =
-      /@(Get|Post|Patch|Put|Delete|Options|Head)\((?:'|")?([^'"]*)?(?:'|")?\)\s*\n\s*@ApiOperation\({ summary: "([^"]+)" }\)\s*\n(?:.|\n)*?\s*(?:async)?\s*(\w+)\s*\(([^)]*)\)/g;
+    const endpointRegex = /@(Get|Post|Patch|Put|Delete|Options|Head)\(\s*(['"`])?([^'"\)]*)\2?\s*\)\s*(?:@ApiOperation\(\s*{[^}]*summary:\s*["']([^"']+)["'][^}]*}\)\s*)?[\s\S]*?\s*(?:async\s+)?(\w+)\s*\(([^)]*)\)/gi;
 
     let match;
     while ((match = endpointRegex.exec(controllerCode)) !== null) {
       const [
         ,
         httpMethodDecorator,
+        ,
         pathSegment,
         summary,
         functionName,
