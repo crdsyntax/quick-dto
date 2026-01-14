@@ -43,8 +43,7 @@
           "id": "httpTesterContainer",
           "title": "HTTP Tester",
           "icon": "images/socket.svg"
-        }
-        ,
+        },
         {
           "id": "dto-properties-panel",
           "title": "DTO Properties",
@@ -232,8 +231,7 @@
         "command": "nest-tools.focusHttpTester",
         "title": "API Tester: Focus",
         "category": "NestJS Tools"
-      }
-      ,
+      },
       {
         "command": "nest-tools.enableAutoCommit",
         "title": "Enable Auto-Commit",
@@ -248,6 +246,11 @@
         "command": "nest-tools.toggleAutoCommit",
         "title": "Toggle Auto-Commit",
         "category": "Git"
+      },
+      {
+        "command": "extension.createProject",
+        "title": "Crear Proyecto...",
+        "category": "Project Tools"
       }
     ],
     "menus": {
@@ -260,6 +263,11 @@
         {
           "command": "nest-tools.clearSearchEntities",
           "when": "view == nest-tools.entityView",
+          "group": "navigation"
+        },
+        {
+          "command": "extension.createProject",
+          "when": "view == workbench.explorer.fileView",
           "group": "navigation"
         }
       ],
@@ -323,6 +331,16 @@
           "command": "nest-tools.generateHttpCollections",
           "group": "NestJS Tools",
           "when": "resourceLangId == 'typescript'"
+        },
+        {
+          "command": "extension.createProject",
+          "group": "navigation",
+          "when": "explorerViewletVisible && !inputFocus"
+        },
+        {
+          "command": "extension.createProject",
+          "group": "navigation",
+          "when": "explorerResourceIsFolder"
         }
       ],
       "editor/context": [
@@ -395,6 +413,12 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "explorer",
+        "contents": "No tienes un proyecto activo.\n[Crear Nuevo Proyecto](command:extension.createProject)"
+      }
+    ],
     "keybindings": [
       {
         "command": "nest-tools.completeReturnType",
@@ -413,8 +437,7 @@
         "key": "ctrl+shift+y",
         "mac": "cmd+shift+t",
         "when": "editorTextFocus"
-      }
-      ,
+      },
       {
         "command": "nest-tools.toggleAutoCommit",
         "key": "ctrl+alt+a",
@@ -434,7 +457,8 @@
     "@types/node": "^18.x",
     "@types/vscode": "^1.80.0",
     "esbuild": "^0.27.0",
-    "vsce": "^2.15.0"
+    "vsce": "^2.15.0",
+    "@types/bun": "latest"
   },
   "dependencies": {
     "@mermaid-js/mermaid-cli": "^11.12.0",
@@ -447,5 +471,9 @@
     "tsconfig-paths": "^4.2.0",
     "tslib": "^2.8.1",
     "typescript": "^5.3.0"
+  },
+  "private": true,
+  "peerDependencies": {
+    "typescript": "^5"
   }
 }

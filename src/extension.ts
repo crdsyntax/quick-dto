@@ -30,6 +30,7 @@ import { addLoggerDebugCommand } from "./commands/logger.command";
 import { createAutoCommitService } from "./commands/auto-commit.command";
 import { generateCollectionsFromControllerCommand } from "./commands/generate-collection.command";
 import { HttpTesterPanel } from "./views/http-tester.view";
+import { handleCreateProject } from "./commands/project-tools.command";
 
 export function activate(context: vscode.ExtensionContext) {
   const entityTreeProvider = new EntityTreeDataProvider(
@@ -91,11 +92,11 @@ export function activate(context: vscode.ExtensionContext) {
 
         EntityVisualizer.createOrShow(
           context.extensionUri,
-          entityNames[0], // using first as 'root' for naming purpose mainly
+          entityNames[0],
           vscode.workspace.rootPath || "",
           context,
-          entityNames, // pass the list!
-          true // strict mode: only show selected entities
+          entityNames,
+          true
         );
       }
     )
@@ -245,11 +246,9 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("nest-tools.clearSearchEntities", () => {
       entityTreeProvider.filter("");
     }),
-
     vscode.commands.registerCommand("nest-tools.openHttpTesterNewTab", () => {
       HttpTesterPanel.createNewTab(context.extensionUri, context);
     }),
-
     vscode.commands.registerCommand("nest-tools.closeAllHttpTesterTabs", () => {
       if (HttpTesterPanel.panels && HttpTesterPanel.panels.length > 0) {
         const panels = [...HttpTesterPanel.panels];
@@ -259,7 +258,6 @@ export function activate(context: vscode.ExtensionContext) {
         );
       }
     }),
-
     vscode.commands.registerCommand("nest-tools.showHttpTesterInfo", () => {
       const count = HttpTesterPanel.getPanelCount();
       if (count === 0) {
@@ -270,6 +268,15 @@ export function activate(context: vscode.ExtensionContext) {
         );
       }
     })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "extension.createProject",
+      async (uri: vscode.Uri) => {
+        await handleCreateProject(uri);
+      }
+    )
   );
 
   context.subscriptions.push(
