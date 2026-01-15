@@ -30,6 +30,7 @@ import { addLoggerDebugCommand } from "./commands/logger.command";
 import { createAutoCommitService } from "./commands/auto-commit.command";
 import { generateCollectionsFromControllerCommand } from "./commands/generate-collection.command";
 import { HttpTesterPanel } from "./views/http-tester.view";
+import { CopyPanel } from "./views/copy-panel.view";
 
 export function activate(context: vscode.ExtensionContext) {
   const entityTreeProvider = new EntityTreeDataProvider(
@@ -144,6 +145,9 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "nest-tools.addLoggerDebug",
       addLoggerDebugCommand
+    ),
+    vscode.commands.registerCommand("nest-tools.copyDatabaseRecord", () =>
+      CopyPanel.createOrShow(context.extensionUri, context)
     ),
     vscode.commands.registerCommand(
       "nest-dto-generator.generateDto",
