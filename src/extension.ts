@@ -34,7 +34,7 @@ import { handleCreateProject } from "./commands/project-tools.command";
 
 export function activate(context: vscode.ExtensionContext) {
   const entityTreeProvider = new EntityTreeDataProvider(
-    vscode.workspace.rootPath
+    vscode.workspace.rootPath,
   );
 
   const treeView = vscode.window.createTreeView("nest-tools.entityView", {
@@ -42,12 +42,10 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   treeView.onDidChangeCheckboxState((e) => {
-    const changedItems = new Set(e.items.map(([item]) => item));
-
     e.items.forEach(([item, state]) => {
       if (item instanceof EntityItem) {
-        if (!item.parent || !changedItems.has(item.parent)) {
-          entityTreeProvider.setChecked(item.filePath, state);
+        if (item.id) {
+          entityTreeProvider.setChecked(item.id, item.filePath, state);
         }
       }
     });
@@ -64,7 +62,7 @@ export function activate(context: vscode.ExtensionContext) {
         const checkedPaths = entityTreeProvider.getCheckedItems();
         if (checkedPaths.length === 0) {
           vscode.window.showWarningMessage(
-            "Please select at least one entity to render."
+            "Please select at least one entity to render.",
           );
           return;
         }
@@ -85,7 +83,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         if (entityNames.length === 0) {
           vscode.window.showWarningMessage(
-            "No valid entities found in selection."
+            "No valid entities found in selection.",
           );
           return;
         }
@@ -96,116 +94,116 @@ export function activate(context: vscode.ExtensionContext) {
           vscode.workspace.rootPath || "",
           context,
           entityNames,
-          true
+          true,
         );
-      }
-    )
+      },
+    ),
   );
 
   const socketProvider = new SocketTesterViewProvider(context.extensionUri);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       SocketTesterViewProvider.viewId,
-      socketProvider
-    )
+      socketProvider,
+    ),
   );
 
   const dtoProvider = new DtoSidebarProvider(context.extensionUri);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       DtoSidebarProvider.viewId,
-      dtoProvider
-    )
+      dtoProvider,
+    ),
   );
 
   const httpTesterProvider = new HttpTesterSidebarProvider(
     context.extensionUri,
-    context
+    context,
   );
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       HttpTesterSidebarProvider.viewId,
-      httpTesterProvider
-    )
+      httpTesterProvider,
+    ),
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "nest-tools.generateHttpCollections",
       (fileUri: vscode.Uri) =>
-        generateCollectionsFromControllerCommand(context, fileUri)
+        generateCollectionsFromControllerCommand(context, fileUri),
     ),
     vscode.commands.registerCommand("nest-tools.openHttpTester", () =>
-      openHttpTesterCommand(context)
+      openHttpTesterCommand(context),
     ),
     vscode.commands.registerCommand(
       "nest-tools.closeHttpTester",
-      closeHttpTesterCommand
+      closeHttpTesterCommand,
     ),
     vscode.commands.registerCommand(
       "nest-tools.addLoggerDebug",
-      addLoggerDebugCommand
+      addLoggerDebugCommand,
     ),
     vscode.commands.registerCommand(
       "nest-dto-generator.generateDto",
-      generateDtoCommand
+      generateDtoCommand,
     ),
     vscode.commands.registerCommand(
       "nest-dto-generator.generateInterface",
-      generateInterfaceCommand
+      generateInterfaceCommand,
     ),
     vscode.commands.registerCommand(
       "nest-dto-generator.generateReturnInterface",
-      generateReturnInterfaceCommand
+      generateReturnInterfaceCommand,
     ),
     vscode.commands.registerCommand(
       "nest-dto-generator.generateRepository",
-      generateRepositoryCommand
+      generateRepositoryCommand,
     ),
     vscode.commands.registerCommand(
       "nest-dto-generator.generateService",
-      generateServiceCommand
+      generateServiceCommand,
     ),
     vscode.commands.registerCommand(
       "nest-dto-generator.generateController",
-      generateControllerCommand
+      generateControllerCommand,
     ),
     vscode.commands.registerCommand(
       "nest-dto-generator.generateCrud",
-      generateCrudCommand
+      generateCrudCommand,
     ),
     vscode.commands.registerCommand(
       "nest-tools.completeReturnType",
-      completeReturnType
+      completeReturnType,
     ),
     vscode.commands.registerCommand(
       "nest-tools.controllerByFunction",
-      generateControllerEndpoint
+      generateControllerEndpoint,
     ),
     vscode.commands.registerCommand(
       "nest-tools.generateEntity",
-      EntityCommand.generateEntity
+      EntityCommand.generateEntity,
     ),
     vscode.commands.registerCommand(
       "nest-tools.generateEntityFromPalette",
-      EntityCommand.generateEntity
+      EntityCommand.generateEntity,
     ),
     vscode.commands.registerCommand(
       "nest-tools.convertOrm",
-      OrmConverter.convertOrm
+      OrmConverter.convertOrm,
     ),
     vscode.commands.registerCommand(
       "nest-tools.migrateToTypeOrm",
-      MongooseToTypeOrmMigrator.migrateToTypeOrm
+      MongooseToTypeOrmMigrator.migrateToTypeOrm,
     ),
     vscode.commands.registerCommand(
       "nest-tools.generateErd",
-      generateErdCommand
+      generateErdCommand,
     ),
     vscode.commands.registerCommand("socketTester.connect", () =>
       vscode.commands.executeCommand(
-        "workbench.view.extension.socketTesterView"
-      )
+        "workbench.view.extension.socketTesterView",
+      ),
     ),
     vscode.commands.registerCommand(
       "nest-tools.viewEntityErd",
@@ -217,23 +215,63 @@ export function activate(context: vscode.ExtensionContext) {
             const match = content.match(/export\s+class\s+(\w+)/);
             if (!match) {
               vscode.window.showWarningMessage(
-                "No se pudo detectar la clase en el archivo."
+                "No se pudo detectar la clase en el archivo.",
               );
               return;
             }
             const entityClassName = match[1];
 
-            EntityVisualizer.createOrShow(
-              context.extensionUri,
-              entityClassName,
-              vscode.workspace.rootPath || "",
-              context
-            );
+            // Obtener las entidades marcadas con checkbox
+            const checkedPaths = entityTreeProvider.getCheckedItems();
+
+            if (checkedPaths.length > 0) {
+              // Si hay entidades marcadas, usar solo esas
+              const entityNames: string[] = [];
+
+              for (const p of checkedPaths) {
+                try {
+                  const fileContent = fs.readFileSync(p, "utf8");
+                  const classMatch = fileContent.match(
+                    /export\s+class\s+(\w+)/,
+                  );
+                  if (classMatch) {
+                    entityNames.push(classMatch[1]);
+                  }
+                } catch (e) {
+                  console.error(e);
+                }
+              }
+
+              if (entityNames.length > 0) {
+                EntityVisualizer.createOrShow(
+                  context.extensionUri,
+                  entityNames[0],
+                  vscode.workspace.rootPath || "",
+                  context,
+                  entityNames,
+                  true, // strict mode: solo mostrar entidades seleccionadas
+                );
+              } else {
+                vscode.window.showWarningMessage(
+                  "No se pudieron procesar las entidades seleccionadas.",
+                );
+              }
+            } else {
+              // Si no hay entidades marcadas, mostrar solo la entidad clickeada
+              EntityVisualizer.createOrShow(
+                context.extensionUri,
+                entityClassName,
+                vscode.workspace.rootPath || "",
+                context,
+                [entityClassName],
+                true, // strict mode: solo mostrar esta entidad
+              );
+            }
           } catch (err: any) {
             vscode.window.showErrorMessage(`Error opening ERD: ${err.message}`);
           }
         }
-      }
+      },
     ),
     vscode.commands.registerCommand("nest-tools.searchEntities", async () => {
       const value = await vscode.window.showInputBox({
@@ -254,7 +292,7 @@ export function activate(context: vscode.ExtensionContext) {
         const panels = [...HttpTesterPanel.panels];
         panels.forEach((panel) => panel.dispose());
         vscode.window.showInformationMessage(
-          `Closed ${panels.length} HTTP Tester tab(s)`
+          `Closed ${panels.length} HTTP Tester tab(s)`,
         );
       }
     }),
@@ -264,10 +302,10 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage("No HTTP Tester tabs are open");
       } else {
         vscode.window.showInformationMessage(
-          `${count} HTTP Tester tab(s) currently open`
+          `${count} HTTP Tester tab(s) currently open`,
         );
       }
-    })
+    }),
   );
 
   context.subscriptions.push(
@@ -275,14 +313,14 @@ export function activate(context: vscode.ExtensionContext) {
       "extension.createProject",
       async (uri: vscode.Uri) => {
         await handleCreateProject(uri);
-      }
-    )
+      },
+    ),
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand("nest-tools.triggerReturnType", () => {
       vscode.commands.executeCommand("nest-tools.completeReturnType");
-    })
+    }),
   );
 
   // Auto-commit service moved to commands/auto-commit.command.ts

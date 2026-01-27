@@ -2,9 +2,9 @@ import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
 
-export class EntityTreeDataProvider
-  implements vscode.TreeDataProvider<EntityItem | EntityFolderItem>
-{
+export class EntityTreeDataProvider implements vscode.TreeDataProvider<
+  EntityItem | EntityFolderItem
+> {
   private _onDidChangeTreeData: vscode.EventEmitter<
     EntityItem | EntityFolderItem | undefined | null | void
   > = new vscode.EventEmitter();
@@ -12,7 +12,8 @@ export class EntityTreeDataProvider
 
   private filterQuery: string = "";
 
-  private checkedItems: Set<string> = new Set();
+  private checkedIds: Set<string> = new Set();
+  private idToFilePath: Map<string, string> = new Map();
 
   constructor(private workspaceRoot: string | undefined) {}
 
@@ -25,29 +26,41 @@ export class EntityTreeDataProvider
     this.refresh();
   }
 
-  setChecked(filePath: string, state: vscode.TreeItemCheckboxState) {
+  setChecked(
+    id: string,
+    filePath: string,
+    state: vscode.TreeItemCheckboxState,
+  ) {
     if (state === vscode.TreeItemCheckboxState.Checked) {
-      this.checkedItems.add(filePath);
+      this.checkedIds.add(id);
+      this.idToFilePath.set(id, filePath);
     } else {
-      this.checkedItems.delete(filePath);
+      this.checkedIds.delete(id);
+      this.idToFilePath.delete(id);
     }
   }
 
   getCheckedItems(): string[] {
-    return Array.from(this.checkedItems);
+    const paths = new Set<string>();
+    this.checkedIds.forEach((id) => {
+      const path = this.idToFilePath.get(id);
+      if (path) paths.add(path);
+    });
+    return Array.from(paths);
   }
 
   getTreeItem(element: EntityItem | EntityFolderItem): vscode.TreeItem {
     if (element instanceof EntityItem) {
-      element.checkboxState = this.checkedItems.has(element.filePath)
-        ? vscode.TreeItemCheckboxState.Checked
-        : vscode.TreeItemCheckboxState.Unchecked;
+      element.checkboxState =
+        element.id && this.checkedIds.has(element.id)
+          ? vscode.TreeItemCheckboxState.Checked
+          : vscode.TreeItemCheckboxState.Unchecked;
     }
     return element;
   }
 
   async getChildren(
-    element?: EntityItem | EntityFolderItem
+    element?: EntityItem | EntityFolderItem,
   ): Promise<(EntityItem | EntityFolderItem)[]> {
     if (!this.workspaceRoot) return [];
 
@@ -69,6 +82,8 @@ export class EntityTreeDataProvider
   }
 
   private async getModuleFolders(srcPath: string): Promise<EntityFolderItem[]> {
+    if (!fs.existsSync(srcPath)) return [];
+
     const dirs = fs
       .readdirSync(srcPath, { withFileTypes: true })
       .filter((d) => d.isDirectory())
@@ -77,8 +92,8 @@ export class EntityTreeDataProvider
           new EntityFolderItem(
             dir.name,
             path.join(srcPath, dir.name),
-            vscode.TreeItemCollapsibleState.Collapsed
-          )
+            vscode.TreeItemCollapsibleState.Collapsed,
+          ),
       );
 
     if (!this.filterQuery) return dirs;
@@ -89,11 +104,11 @@ export class EntityTreeDataProvider
   private async getEntitiesInFolder(folderPath: string): Promise<EntityItem[]> {
     const entityPattern = new vscode.RelativePattern(
       folderPath,
-      "**/*.entity.ts"
+      "**/*.entity.ts",
     );
     const schemaPattern = new vscode.RelativePattern(
       folderPath,
-      "**/*.schema.ts"
+      "**/*.schema.ts",
     );
 
     const files = [
@@ -113,14 +128,14 @@ export class EntityTreeDataProvider
         file.fsPath,
         hasRels
           ? vscode.TreeItemCollapsibleState.Collapsed
-          : vscode.TreeItemCollapsibleState.None
+          : vscode.TreeItemCollapsibleState.None,
       );
     });
 
     if (!this.filterQuery) return items;
 
     return items.filter((i) =>
-      i.label.toLowerCase().includes(this.filterQuery)
+      i.label.toLowerCase().includes(this.filterQuery),
     );
   }
 
@@ -156,7 +171,7 @@ export class EntityTreeDataProvider
 
         const nextLines = content.substring(
           match.index + match[0].length,
-          match.index + match[0].length + 100
+          match.index + match[0].length + 100,
         );
         const propertyNameMatch = nextLines.match(/^\s*\)?\s*(\w+)\s*[:?]/);
         const propertyName = propertyNameMatch ? propertyNameMatch[1] : "";
@@ -165,7 +180,8 @@ export class EntityTreeDataProvider
           targetEntity &&
           !relations.some(
             (r) =>
-              r.targetEntity === targetEntity && r.propertyName === propertyName
+              r.targetEntity === targetEntity &&
+              r.propertyName === propertyName,
           )
         ) {
           relations.push({ type, targetEntity, propertyName });
@@ -189,7 +205,7 @@ export class EntityTreeDataProvider
         let filePath = await this.findEntityFile(
           rel.targetEntity,
           item.filePath,
-          content
+          content,
         );
 
         if (filePath) {
@@ -203,7 +219,7 @@ export class EntityTreeDataProvider
             hasRels
               ? vscode.TreeItemCollapsibleState.Collapsed
               : vscode.TreeItemCollapsibleState.None,
-            item
+            item,
           );
           relatedItem.description = rel.type;
           relatedItems.push(relatedItem);
@@ -218,11 +234,11 @@ export class EntityTreeDataProvider
   private async findEntityFile(
     targetEntity: string,
     sourceFilePath: string,
-    content: string
+    content: string,
   ): Promise<string | undefined> {
     const importRegex = new RegExp(
       `import\\s+{[^}]*${targetEntity}[^}]*}\\s+from\\s+['"](.*)['"]`,
-      "i"
+      "i",
     );
     const match = content.match(importRegex);
     if (match) {
@@ -230,7 +246,7 @@ export class EntityTreeDataProvider
       if (importPath.startsWith(".")) {
         const absolutePath = path.resolve(
           path.dirname(sourceFilePath),
-          importPath
+          importPath,
         );
         const extensions = [".ts", ".entity.ts", ".schema.ts", "/index.ts", ""];
         for (const ext of extensions) {
@@ -263,7 +279,7 @@ export class EntityFolderItem extends vscode.TreeItem {
   constructor(
     public readonly label: string,
     public readonly folderPath: string,
-    collapsibleState: vscode.TreeItemCollapsibleState
+    collapsibleState: vscode.TreeItemCollapsibleState,
   ) {
     super(label, collapsibleState);
     this.iconPath = new vscode.ThemeIcon("folder-library");
@@ -275,18 +291,19 @@ export class EntityItem extends vscode.TreeItem {
     public readonly label: string,
     public readonly filePath: string,
     collapsibleState: vscode.TreeItemCollapsibleState,
-    public readonly parent?: EntityItem
+    public readonly parent?: EntityItem,
   ) {
     super(label, collapsibleState);
     this.description = path.basename(filePath);
     this.tooltip = filePath;
 
-    this.command = {
-      command: "nest-tools.viewEntityErd",
-      title: "View ER Diagram",
-      arguments: [this],
-    };
+    if (parent && parent.id) {
+      this.id = `${parent.id}::${label}`;
+    } else {
+      this.id = filePath;
+    }
 
+    this.contextValue = "entityItem";
     this.iconPath = new vscode.ThemeIcon("symbol-class");
   }
 }

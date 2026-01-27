@@ -17,7 +17,7 @@ export class EntityVisualizer {
   private constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
   ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
@@ -35,10 +35,16 @@ export class EntityVisualizer {
           case "error":
             vscode.window.showErrorMessage(message.message);
             break;
+          case "copyToClipboard":
+            vscode.env.clipboard.writeText(message.text);
+            vscode.window.showInformationMessage(
+              "Diagrama copiado al portapapeles (formato Markdown/Mermaid).",
+            );
+            break;
         }
       },
       null,
-      this._disposables
+      this._disposables,
     );
   }
 
@@ -48,7 +54,7 @@ export class EntityVisualizer {
     rootPath: string,
     context: vscode.ExtensionContext,
     entityList?: string[],
-    strict: boolean = false
+    strict: boolean = false,
   ) {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
@@ -76,13 +82,13 @@ export class EntityVisualizer {
         enableScripts: true,
         retainContextWhenHidden: true,
         localResourceRoots: [vscode.Uri.joinPath(extensionUri, "media")],
-      }
+      },
     );
 
     EntityVisualizer.currentPanel = new EntityVisualizer(
       panel,
       extensionUri,
-      context
+      context,
     );
     EntityVisualizer.currentPanel._update(erdData, entityName, rootPath);
   }
@@ -253,6 +259,7 @@ export class EntityVisualizer {
             <div id="controls">
                 <button id="resetBtn">Reset Layout</button>
                 <button id="exportBtn">Export SVG</button>
+                <button id="copyBtn">Copy Markdown</button>
             </div>
             <svg id="diagram"></svg>
             
@@ -453,13 +460,10 @@ export class EntityVisualizer {
                                     } else if (field.isEnum) {
                                         icon = "E ";
                                         className = "field-enum";
-                                        // Ensure generic enums (e.g. UserRole) display nicely
-                                        // The type already contains the name
                                     }
 
                                     const nullable = field.isNullable ? "?" : "";
                                     
-                                    // Custom enum display format if requested
                                     if (field.isEnum) {
                                         typeDisplay = "ENUM " + field.type;
                                     }
@@ -473,7 +477,6 @@ export class EntityVisualizer {
                                         .text(text);
 
                                     if (field.isRelation) {
-                                        // Find which relation this field belongs to
                                         const relation = d.data.relations.find(r => r.propertyName === field.name);
                                         if (relation) {
                                             fieldText.on("click", function(e) {
@@ -488,7 +491,7 @@ export class EntityVisualizer {
                         });
 
 
-                        // Update positions for all nodes (entering and existing)
+                        // Update positions
                          nodeEnter.merge(nodeSelection)
                             .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
 
@@ -497,21 +500,17 @@ export class EntityVisualizer {
                     
                     
                     function updateLinks(linksSelection, nodesSelection) {
-                    
-                         
                         linksSelection.each(function(d) {
                             const sourceNode = nodes.find(function(n) { return n.id === d.source; });
                             const targetNode = nodes.find(function(n) { return n.id === d.target; });
                             
                             if (!sourceNode || !targetNode) return;
                             
-                            // Calculate connection points
                             const sx = sourceNode.x + sourceNode.width / 2;
                             const sy = sourceNode.y + sourceNode.height / 2;
                             const tx = targetNode.x + targetNode.width / 2;
                             const ty = targetNode.y + targetNode.height / 2;
                             
-                            // Create orthogonal path (with corners)
                             const midX = (sx + tx) / 2;
                             const path = "M " + sx + "," + sy + " L " + midX + "," + sy + " L " + midX + "," + ty + " L " + tx + "," + ty;
                             
@@ -525,7 +524,6 @@ export class EntityVisualizer {
                         });
                     }
                     
-                    
                     // Drag functions
                     function dragStarted(event, d) {
                         d3.select(this).raise();
@@ -535,16 +533,12 @@ export class EntityVisualizer {
                         d.x = event.x;
                         d.y = event.y;
                         d3.select(this).attr("transform", "translate(" + d.x + "," + d.y + ")");
-                        
-                        // Pass current selections to updateLinks
-                        // We can just re-select them or pass them if we had them globally
                         const allLinks = linkGroup.selectAll("g");
                         const allNodes = nodeGroup.selectAll(".entity-node");
                         updateLinks(allLinks, allNodes);
                     }
                     
                     function dragEnded(event, d) {
-                        // Save positions
                         const positions = {};
                         nodes.forEach(function(node) {
                             positions[node.id] = { x: node.x, y: node.y };
@@ -564,9 +558,8 @@ export class EntityVisualizer {
                             node.y = height / 2 + radius * Math.sin(angle) - node.height / 2;
                         });
                         
-                        render(); // Re-render to update positions
+                        render();
                         
-                        // Save new positions
                         const positions = {};
                         nodes.forEach(function(node) {
                             positions[node.id] = { x: node.x, y: node.y };
@@ -579,14 +572,91 @@ export class EntityVisualizer {
                     
                     // Export button
                     document.getElementById("exportBtn").addEventListener("click", function() {
-                        const svgData = new XMLSerializer().serializeToString(document.getElementById("diagram"));
+                        const svgEl = document.getElementById("diagram");
+                        const clone = svgEl.cloneNode(true);
+                        
+                        const style = getComputedStyle(document.body);
+                        const bgColor = style.getPropertyValue('--vscode-editor-background') || '#1e1e1e';
+                        const fgColor = style.getPropertyValue('--vscode-editor-foreground') || '#cccccc';
+                        const borderColor = style.getPropertyValue('--vscode-panel-border') || '#444';
+                        const cyanColor = style.getPropertyValue('--vscode-terminal-ansiCyan') || '#4ec9b0';
+                        const yellowColor = style.getPropertyValue('--vscode-terminal-ansiYellow') || '#dcdcaa';
+                        const blueColor = style.getPropertyValue('--vscode-terminal-ansiBlue') || '#569cd6';
+                        
+                        const styleEl = document.createElementNS("http://www.w3.org/2000/svg", "style");
+                        styleEl.textContent = \`
+                            .entity-box { fill: \${bgColor}; stroke: \${borderColor}; stroke-width: 2px; rx: 4px; }
+                            .entity-title { fill: \${fgColor}; font-weight: bold; font-family: sans-serif; font-size: 14px; text-anchor: middle; dominant-baseline: middle; }
+                            .entity-field { fill: \${fgColor}; font-family: sans-serif; font-size: 12px; }
+                            .field-primary { fill: \${yellowColor}; font-weight: bold; font-family: sans-serif; font-size: 12px; }
+                            .field-relation { fill: \${blueColor}; text-decoration: underline; font-family: sans-serif; font-size: 12px; }
+                            .field-enum { fill: \${cyanColor}; font-style: italic; font-family: sans-serif; font-size: 12px; }
+                            .relation-path { fill: none; stroke: \${cyanColor}; stroke-width: 2px; }
+                            .relation-label { fill: \${fgColor}; font-size: 11px; font-family: sans-serif; text-anchor: middle; }
+                            text { font-family: Segoe UI, sans-serif; }
+                        \`;
+                        
+                        clone.insertBefore(styleEl, clone.firstChild);
+                        
+                        const svgData = new XMLSerializer().serializeToString(clone);
                         const blob = new Blob([svgData], { type: "image/svg+xml" });
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement("a");
                         a.href = url;
-                        a.download = "erd-diagram.svg";
+                        a.download = "erd-diagram-" + new Date().toISOString().slice(0,10) + ".svg";
                         a.click();
                         URL.revokeObjectURL(url);
+                    });
+
+                    // Generate Mermaid
+                    function generateMermaid(data) {
+                        let mermaid = "erDiagram\\n";
+                        
+                        Object.entries(data.entities).forEach(function(entry) { 
+                            const name = entry[0];
+                            const entity = entry[1];
+                            mermaid += "    " + name + " {\\n";
+                            if (entity.fields) {
+                                entity.fields.forEach(function(f) {
+                                    let type = (f.type || 'string').replace(/[^a-zA-Z0-9_\\[\\]]/g, ''); 
+                                    let fname = (f.name || '').replace(/[^a-zA-Z0-9_]/g, '');
+                                    mermaid += "        " + type + " " + fname + "\\n";
+                                });
+                            }
+                            mermaid += "    }\\n";
+                        });
+
+                        const relMap = {
+                            'ManyToOne': '}o--||',
+                            'OneToMany': '||--o{',
+                            'OneToOne': '||--||',
+                            'ManyToMany': '}o--o{'
+                        };
+
+                        Object.entries(data.entities).forEach(function(entry) {
+                            const name = entry[0];
+                            const entity = entry[1];
+                            if (entity.relations) {
+                                entity.relations.forEach(function(rel) {
+                                    if (data.entities[rel.targetEntity]) {
+                                        const symbol = relMap[rel.type] || '}o--o{';
+                                        mermaid += "    " + name + " " + symbol + " " + rel.targetEntity + " : \\\"" + (rel.propertyName || '') + "\\\"\\n";
+                                    }
+                                });
+                            }
+                        });
+                        
+                        return mermaid;
+                    }
+
+                    document.getElementById("copyBtn").addEventListener("click", function() {
+                        const code = generateMermaid(erdData);
+                        const backticks = String.fromCharCode(96).repeat(3);
+                        const markdown = backticks + "mermaid\\n" + code + backticks;
+                        vscode.postMessage({
+                            type: 'copyToClipboard',
+                            text: markdown
+                        });
                     });
 
                     // Initial render

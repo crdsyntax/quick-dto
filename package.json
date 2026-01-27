@@ -171,7 +171,8 @@
       {
         "command": "nest-tools.viewEntityErd",
         "title": "View ER Diagram",
-        "category": "NestJS"
+        "category": "NestJS",
+        "icon": "$(graph)"
       },
       {
         "command": "nest-tools.searchEntities",
@@ -254,6 +255,13 @@
       }
     ],
     "menus": {
+      "view/item/context": [
+        {
+          "command": "nest-tools.viewEntityErd",
+          "when": "view == nest-tools.entityView && viewItem == entityItem",
+          "group": "inline"
+        }
+      ],
       "view/title": [
         {
           "command": "nest-tools.searchEntities",
