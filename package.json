@@ -252,6 +252,18 @@
         "command": "extension.createProject",
         "title": "Crear Proyecto...",
         "category": "Project Tools"
+      },
+      {
+        "command": "nest-tools.openFlowchartEditor",
+        "title": "Open Flowchart Editor",
+        "category": "NestJS Tools",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "nest-tools.renderSelectedAsFlowchart",
+        "title": "Render Selected Entities as Flowchart",
+        "category": "NestJS Tools",
+        "icon": "$(type-hierarchy-sub)"
       }
     ],
     "menus": {
@@ -264,14 +276,19 @@
       ],
       "view/title": [
         {
+          "command": "nest-tools.renderSelectedAsFlowchart",
+          "when": "view == nest-tools.entityView",
+          "group": "navigation@1"
+        },
+        {
           "command": "nest-tools.searchEntities",
           "when": "view == nest-tools.entityView",
-          "group": "navigation"
+          "group": "navigation@2"
         },
         {
           "command": "nest-tools.clearSearchEntities",
           "when": "view == nest-tools.entityView",
-          "group": "navigation"
+          "group": "navigation@3"
         },
         {
           "command": "extension.createProject",
@@ -396,6 +413,9 @@
       "command-palette": [
         {
           "command": "nest-tools.generateEntityFromPalette"
+        },
+        {
+          "command": "nest-tools.openFlowchartEditor"
         },
         {
           "command": "nest-tools.convertOrm"

@@ -31,6 +31,7 @@ import { createAutoCommitService } from "./commands/auto-commit.command";
 import { generateCollectionsFromControllerCommand } from "./commands/generate-collection.command";
 import { HttpTesterPanel } from "./views/http-tester.view";
 import { handleCreateProject } from "./commands/project-tools.command";
+import { openFlowchartEditorCommand } from "./commands/flowchart.command";
 
 export function activate(context: vscode.ExtensionContext) {
   const entityTreeProvider = new EntityTreeDataProvider(
@@ -281,6 +282,22 @@ export function activate(context: vscode.ExtensionContext) {
         entityTreeProvider.filter(value);
       }
     }),
+    vscode.commands.registerCommand("nest-tools.openFlowchartEditor", () =>
+      openFlowchartEditorCommand(context, entityTreeProvider)
+    ),
+    vscode.commands.registerCommand(
+      "nest-tools.renderSelectedAsFlowchart",
+      async () => {
+        const checkedPaths = entityTreeProvider.getCheckedItems();
+        if (checkedPaths.length === 0) {
+          vscode.window.showWarningMessage(
+            "Selecciona al menos una entidad con checkbox para crear el diagrama."
+          );
+          return;
+        }
+        openFlowchartEditorCommand(context, entityTreeProvider);
+      }
+    ),
     vscode.commands.registerCommand("nest-tools.clearSearchEntities", () => {
       entityTreeProvider.filter("");
     }),
