@@ -28,6 +28,7 @@ export interface FlowchartNode {
   width?: number;
   height?: number;
   color?: string;
+  opacity?: number; // 0–1
   data?: EntityData; // Para nodos tipo 'entity'
 }
 

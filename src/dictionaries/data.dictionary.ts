@@ -38,20 +38,7 @@ export class DataDictionary {
             description: 'Identificador único',
             example: 'uuid-v4'
         },
-        {
-            name: 'createdAt',
-            type: 'Date',
-            required: true,
-            description: 'Fecha de creación',
-            example: '2023-01-01T00:00:00.000Z'
-        },
-        {
-            name: 'updatedAt',
-            type: 'Date',
-            required: true,
-            description: 'Fecha de actualización',
-            example: '2023-01-01T00:00:00.000Z'
-        },
+
         {
             name: 'isActive',
             type: 'boolean',

@@ -495,7 +495,7 @@ export class FlowchartEditorPanel {
         <div id="node-props" style="display:none;">
             <div class="prop-group">
                 <label>Etiqueta</label>
-                <input type="text" id="prop-label">
+                <input type="text" id="prop-label" placeholder="Nombre del nodo">
             </div>
             <div class="prop-group">
                 <label>Tipo</label>
@@ -506,6 +506,15 @@ export class FlowchartEditorPanel {
                     <option value="start">Inicio</option>
                     <option value="end">Fin</option>
                 </select>
+            </div>
+            <div class="prop-group">
+                <label>Color de relleno</label>
+                <input type="color" id="prop-color" value="#1e1e1e" style="width:100%;height:28px;padding:2px;cursor:pointer;">
+            </div>
+            <div class="prop-group">
+                <label>Opacidad</label>
+                <input type="range" id="prop-opacity" min="0" max="100" value="100" style="width:100%;">
+                <span id="prop-opacity-value" style="font-size:11px;color:var(--vscode-descriptionForeground);">100%</span>
             </div>
         </div>
         <div id="edge-props" style="display:none;">
@@ -727,10 +736,16 @@ export class FlowchartEditorPanel {
             document.getElementById('node-props').style.display = 'block';
             document.getElementById('edge-props').style.display = 'none';
             
-            document.getElementById('prop-label').value = node.label;
+            document.getElementById('prop-label').value = node.label || '';
             document.getElementById('prop-type').value = node.type;
             
-            // Disable type change for entities
+            const colorInput = document.getElementById('prop-color');
+            colorInput.value = node.color || '#1e1e1e';
+            
+            const opacityVal = node.opacity != null ? Math.round(node.opacity * 100) : 100;
+            document.getElementById('prop-opacity').value = opacityVal;
+            document.getElementById('prop-opacity-value').textContent = opacityVal + '%';
+            
             document.getElementById('prop-type').disabled = node.type === 'entity';
         }
         
@@ -748,7 +763,13 @@ export class FlowchartEditorPanel {
             document.getElementById('properties').classList.remove('visible');
         }
         
-        // Property change handlers
+        // Property change handlers - use oninput for label so it updates as you type
+        document.getElementById('prop-label').oninput = function() {
+            if (selectedNode) {
+                selectedNode.label = this.value;
+                updateSelectedNodeDisplay();
+            }
+        };
         document.getElementById('prop-label').onchange = function() {
             if (selectedNode) {
                 selectedNode.label = this.value;
@@ -786,6 +807,33 @@ export class FlowchartEditorPanel {
                 render();
             }
         };
+        
+        document.getElementById('prop-color').oninput = function() {
+            if (selectedNode) {
+                selectedNode.color = this.value;
+                updateSelectedNodeDisplay();
+            }
+        };
+        
+        document.getElementById('prop-opacity').oninput = function() {
+            if (selectedNode) {
+                selectedNode.opacity = parseInt(this.value, 10) / 100;
+                document.getElementById('prop-opacity-value').textContent = this.value + '%';
+                updateSelectedNodeDisplay();
+            }
+        };
+        
+        // Update label and color/opacity for selected node (live preview while typing)
+        function updateSelectedNodeDisplay() {
+            if (!selectedNode) return;
+            const nodeEl = nodeGroup.selectAll('.node').filter(d => d.id === selectedNode.id);
+            if (nodeEl.empty()) return;
+            nodeEl.select('.node-label').text(selectedNode.label);
+            nodeEl.select('.entity-title').text(selectedNode.label);
+            const fill = selectedNode.color || 'var(--vscode-editor-background)';
+            const opacity = selectedNode.opacity != null ? selectedNode.opacity : 1;
+            nodeEl.select('.node-shape').attr('fill', fill).attr('opacity', opacity);
+        }
         
         // Connection handling
         function startConnection(node, event) {
@@ -1052,20 +1100,32 @@ export class FlowchartEditorPanel {
                     });
             });
             
-            // Update positions
-            nodeEnter.merge(nodeSelection)
-                .attr("transform", d => \`translate(\${d.x},\${d.y})\`);
+            // Update positions and sync label / color / opacity for all nodes
+            const merged = nodeEnter.merge(nodeSelection);
+            merged.attr("transform", d => \`translate(\${d.x},\${d.y})\`);
+            merged.each(function(d) {
+                const g = d3.select(this);
+                g.select(".node-label").text(d.label);
+                g.select(".entity-title").text(d.label);
+                const fill = d.color || "var(--vscode-editor-background)";
+                const opacity = d.opacity != null ? d.opacity : 1;
+                g.select(".node-shape").attr("fill", fill).attr("opacity", opacity);
+            });
         }
         
         function drawEntityNode(g, d) {
             const headerHeight = 35;
+            const fill = d.color || "var(--vscode-editor-background)";
+            const opacity = d.opacity != null ? d.opacity : 1;
             
             // Main box
             g.append("rect")
                 .attr("class", "node-shape entity")
                 .attr("width", d.width)
                 .attr("height", d.height)
-                .attr("rx", 4);
+                .attr("rx", 4)
+                .attr("fill", fill)
+                .attr("opacity", opacity);
             
             // Header
             g.append("rect")
@@ -1115,11 +1175,15 @@ export class FlowchartEditorPanel {
         }
         
         function drawRectNode(g, d) {
+            const fill = d.color || "var(--vscode-editor-background)";
+            const opacity = d.opacity != null ? d.opacity : 1;
             g.append("rect")
                 .attr("class", "node-shape process")
                 .attr("width", d.width)
                 .attr("height", d.height)
-                .attr("rx", 4);
+                .attr("rx", 4)
+                .attr("fill", fill)
+                .attr("opacity", opacity);
             
             g.append("text")
                 .attr("class", "node-label")
@@ -1131,10 +1195,13 @@ export class FlowchartEditorPanel {
         function drawDiamondNode(g, d) {
             const cx = d.width / 2;
             const cy = d.height / 2;
-            
+            const fill = d.color || "var(--vscode-editor-background)";
+            const opacity = d.opacity != null ? d.opacity : 1;
             g.append("polygon")
                 .attr("class", "node-shape decision")
-                .attr("points", \`\${cx},0 \${d.width},\${cy} \${cx},\${d.height} 0,\${cy}\`);
+                .attr("points", \`\${cx},0 \${d.width},\${cy} \${cx},\${d.height} 0,\${cy}\`)
+                .attr("fill", fill)
+                .attr("opacity", opacity);
             
             g.append("text")
                 .attr("class", "node-label")
@@ -1144,12 +1211,16 @@ export class FlowchartEditorPanel {
         }
         
         function drawEllipseNode(g, d) {
+            const fill = d.color || "var(--vscode-editor-background)";
+            const opacity = d.opacity != null ? d.opacity : 1;
             g.append("ellipse")
                 .attr("class", "node-shape " + d.type)
                 .attr("cx", d.width / 2)
                 .attr("cy", d.height / 2)
                 .attr("rx", d.width / 2)
-                .attr("ry", d.height / 2);
+                .attr("ry", d.height / 2)
+                .attr("fill", fill)
+                .attr("opacity", opacity);
             
             g.append("text")
                 .attr("class", "node-label")
