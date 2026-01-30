@@ -35,7 +35,10 @@ export async function openFlowchartEditorCommand(
   let initialData: FlowchartData = { nodes: [], edges: [] };
 
   if (entityNames.length > 0) {
-    const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+    const rootPath =
+      entityTreeProvider.workspaceRoot ||
+      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
+      "";
 
     try {
       const erdData = await generateErdDataForEntities(

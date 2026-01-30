@@ -264,6 +264,12 @@
         "title": "Render Selected Entities as Flowchart",
         "category": "NestJS Tools",
         "icon": "$(type-hierarchy-sub)"
+      },
+      {
+        "command": "nest-tools.selectEntityViewFolder",
+        "title": "Select Workspace Folder for Entity View",
+        "category": "NestJS Tools",
+        "icon": "$(folder-opened)"
       }
     ],
     "menus": {
@@ -276,19 +282,24 @@
       ],
       "view/title": [
         {
-          "command": "nest-tools.renderSelectedAsFlowchart",
+          "command": "nest-tools.selectEntityViewFolder",
           "when": "view == nest-tools.entityView",
           "group": "navigation@1"
         },
         {
-          "command": "nest-tools.searchEntities",
+          "command": "nest-tools.renderSelectedAsFlowchart",
           "when": "view == nest-tools.entityView",
           "group": "navigation@2"
         },
         {
-          "command": "nest-tools.clearSearchEntities",
+          "command": "nest-tools.searchEntities",
           "when": "view == nest-tools.entityView",
           "group": "navigation@3"
+        },
+        {
+          "command": "nest-tools.clearSearchEntities",
+          "when": "view == nest-tools.entityView",
+          "group": "navigation@4"
         },
         {
           "command": "extension.createProject",
@@ -413,6 +424,9 @@
       "command-palette": [
         {
           "command": "nest-tools.generateEntityFromPalette"
+        },
+        {
+          "command": "nest-tools.selectEntityViewFolder"
         },
         {
           "command": "nest-tools.openFlowchartEditor"

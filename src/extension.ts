@@ -33,10 +33,21 @@ import { HttpTesterPanel } from "./views/http-tester.view";
 import { handleCreateProject } from "./commands/project-tools.command";
 import { openFlowchartEditorCommand } from "./commands/flowchart.command";
 
+const ENTITY_VIEW_FOLDER_KEY = "entityView.selectedFolder";
+
+function getInitialEntityViewRoot(context: vscode.ExtensionContext): string | undefined {
+  const folders = vscode.workspace.workspaceFolders;
+  if (!folders || folders.length === 0) return undefined;
+  if (folders.length === 1) return folders[0].uri.fsPath;
+
+  const stored = context.workspaceState.get<string>(ENTITY_VIEW_FOLDER_KEY);
+  if (stored && folders.some((f) => f.uri.fsPath === stored)) return stored;
+  return folders[0].uri.fsPath;
+}
+
 export function activate(context: vscode.ExtensionContext) {
-  const entityTreeProvider = new EntityTreeDataProvider(
-    vscode.workspace.rootPath,
-  );
+  const initialRoot = getInitialEntityViewRoot(context);
+  const entityTreeProvider = new EntityTreeDataProvider(initialRoot);
 
   const treeView = vscode.window.createTreeView("nest-tools.entityView", {
     treeDataProvider: entityTreeProvider,
@@ -89,10 +100,20 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
+        const rootPath =
+          entityTreeProvider.workspaceRoot ||
+          vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
+          "";
+        if (!rootPath) {
+          vscode.window.showWarningMessage(
+            "No workspace folder selected. Use the folder icon in Entity View to select a project.",
+          );
+          return;
+        }
         EntityVisualizer.createOrShow(
           context.extensionUri,
           entityNames[0],
-          vscode.workspace.rootPath || "",
+          rootPath,
           context,
           entityNames,
           true,
@@ -243,11 +264,15 @@ export function activate(context: vscode.ExtensionContext) {
                 }
               }
 
+              const rootPath =
+                entityTreeProvider.workspaceRoot ||
+                vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
+                "";
               if (entityNames.length > 0) {
                 EntityVisualizer.createOrShow(
                   context.extensionUri,
                   entityNames[0],
-                  vscode.workspace.rootPath || "",
+                  rootPath,
                   context,
                   entityNames,
                   true, // strict mode: solo mostrar entidades seleccionadas
@@ -259,10 +284,20 @@ export function activate(context: vscode.ExtensionContext) {
               }
             } else {
               // Si no hay entidades marcadas, mostrar solo la entidad clickeada
+              const rootPath =
+                entityTreeProvider.workspaceRoot ||
+                vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
+                "";
+              if (!rootPath) {
+                vscode.window.showWarningMessage(
+                  "Selecciona una carpeta del workspace en Entity View (ícono de carpeta).",
+                );
+                return;
+              }
               EntityVisualizer.createOrShow(
                 context.extensionUri,
                 entityClassName,
-                vscode.workspace.rootPath || "",
+                rootPath,
                 context,
                 [entityClassName],
                 true, // strict mode: solo mostrar esta entidad
@@ -271,6 +306,49 @@ export function activate(context: vscode.ExtensionContext) {
           } catch (err: any) {
             vscode.window.showErrorMessage(`Error opening ERD: ${err.message}`);
           }
+        }
+      },
+    ),
+    vscode.commands.registerCommand(
+      "nest-tools.selectEntityViewFolder",
+      async () => {
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders || folders.length === 0) {
+          vscode.window.showWarningMessage(
+            "No hay carpetas abiertas en el workspace.",
+          );
+          return;
+        }
+        if (folders.length === 1) {
+          vscode.window.showInformationMessage(
+            "Solo hay una carpeta en el workspace.",
+          );
+          return;
+        }
+
+        const currentRoot = entityTreeProvider.workspaceRoot;
+        const items = folders.map((f) => ({
+          label: f.name,
+          description: f.uri.fsPath,
+          folder: f,
+          picked: f.uri.fsPath === currentRoot,
+        }));
+
+        const selected = await vscode.window.showQuickPick(items, {
+          placeHolder: "Selecciona la carpeta del proyecto para el Entity View",
+          matchOnDescription: true,
+          title: "Carpeta del Entity View",
+        });
+
+        if (selected) {
+          entityTreeProvider.setWorkspaceRoot(selected.folder.uri.fsPath);
+          context.workspaceState.update(
+            ENTITY_VIEW_FOLDER_KEY,
+            selected.folder.uri.fsPath,
+          );
+          vscode.window.showInformationMessage(
+            `Entity View: mostrando entidades de "${selected.label}".`,
+          );
         }
       },
     ),

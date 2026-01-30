@@ -15,7 +15,28 @@ export class EntityTreeDataProvider implements vscode.TreeDataProvider<
   private checkedIds: Set<string> = new Set();
   private idToFilePath: Map<string, string> = new Map();
 
-  constructor(private workspaceRoot: string | undefined) {}
+  private _workspaceRoot: string | undefined;
+
+  constructor(workspaceRoot: string | undefined) {
+    this._workspaceRoot = workspaceRoot;
+  }
+
+  get workspaceRoot(): string | undefined {
+    return this._workspaceRoot;
+  }
+
+  /**
+   * Cambia la carpeta del workspace desde la cual se escanean las entidades.
+   * Útil en workspaces multi-raíz para elegir qué proyecto mostrar.
+   */
+  setWorkspaceRoot(root: string | undefined): void {
+    if (this._workspaceRoot !== root) {
+      this._workspaceRoot = root;
+      this.checkedIds.clear();
+      this.idToFilePath.clear();
+      this.refresh();
+    }
+  }
 
   refresh(): void {
     this._onDidChangeTreeData.fire();
@@ -64,7 +85,7 @@ export class EntityTreeDataProvider implements vscode.TreeDataProvider<
   ): Promise<(EntityItem | EntityFolderItem)[]> {
     if (!this.workspaceRoot) return [];
 
-    const srcPath = path.join(this.workspaceRoot, "src");
+    const srcPath = path.join(this._workspaceRoot, "src");
 
     if (!element) {
       return this.getModuleFolders(srcPath);

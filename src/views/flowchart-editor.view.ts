@@ -552,12 +552,19 @@ export class FlowchartEditorPanel {
         let nodeIdCounter = nodes.length + 1;
         let edgeIdCounter = edges.length + 1;
         
-        // Setup SVG
+        // Setup SVG - explicit dimensions with fallback (webview can report 0 on first load)
         const svg = d3.select("#canvas");
-        const width = window.innerWidth - 310; // toolbar + properties
-        const height = window.innerHeight;
+        let width = Math.max((window.innerWidth || 0) - 310, 800);
+        let height = Math.max(window.innerHeight || 0, 600);
         
-        svg.attr("width", "100%").attr("height", "100%");
+        svg.attr("width", width).attr("height", height);
+        
+        function updateSvgSize() {
+            width = Math.max((window.innerWidth || 0) - 310, 800);
+            height = Math.max(window.innerHeight || 0, 600);
+            svg.attr("width", width).attr("height", height);
+        }
+        window.addEventListener("resize", updateSvgSize);
         
         // Defs for arrows
         const defs = svg.append("defs");
@@ -1151,9 +1158,12 @@ export class FlowchartEditorPanel {
                 .text(d.label);
         }
         
-        // Initial render
+        // Initial render - delay one frame so webview has layout dimensions
         setMode('select');
-        render();
+        requestAnimationFrame(function() {
+            updateSvgSize();
+            render();
+        });
         
         // Auto-save on window close
         window.addEventListener('beforeunload', saveData);

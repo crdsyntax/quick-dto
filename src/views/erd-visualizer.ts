@@ -62,10 +62,27 @@ export class EntityVisualizer {
 
     // Generate ERD data
     let erdData;
-    if (entityList && entityList.length > 0) {
-      erdData = await generateErdDataForEntities(rootPath, entityList, strict);
-    } else {
-      erdData = await generateErdData(rootPath, entityName);
+    try {
+      if (entityList && entityList.length > 0) {
+        erdData = await generateErdDataForEntities(rootPath, entityList, strict);
+      } else {
+        erdData = await generateErdData(rootPath, entityName);
+      }
+    } catch (err) {
+      console.error("ERD generation error:", err);
+      vscode.window.showErrorMessage(
+        "No se pudo generar el diagrama. Verifica que la carpeta del proyecto tenga tsconfig.json y archivos .entity.ts en src/.",
+      );
+      return;
+    }
+
+    const entityCount =
+      erdData?.entities && Object.keys(erdData.entities).length;
+    if (!entityCount) {
+      vscode.window.showWarningMessage(
+        "No se encontraron entidades para mostrar. Revisa la carpeta seleccionada en Entity View.",
+      );
+      return;
     }
 
     if (EntityVisualizer.currentPanel) {
@@ -278,12 +295,19 @@ export class EntityVisualizer {
                         nodeSpacing: 100,
                     };
                     
-                    // Setup SVG
+                    // Setup SVG - fallback dimensions when webview not yet laid out
                     const svg = d3.select("#diagram");
-                    const width = window.innerWidth;
-                    const height = window.innerHeight;
+                    let width = Math.max(window.innerWidth || 0, 800);
+                    let height = Math.max(window.innerHeight || 0, 600);
                     
                     svg.attr("width", width).attr("height", height);
+                    
+                    function updateSize() {
+                        width = Math.max(window.innerWidth || 0, 800);
+                        height = Math.max(window.innerHeight || 0, 600);
+                        svg.attr("width", width).attr("height", height);
+                    }
+                    window.addEventListener("resize", updateSize);
                     
                     // Create arrow marker
                     svg.append("defs").append("marker")
@@ -313,8 +337,11 @@ export class EntityVisualizer {
                     const linkGroup = container.append("g").attr("class", "links");
                     const nodeGroup = container.append("g").attr("class", "nodes");
                     
+                    // Guard: ensure entities exists
+                    const entities = erdData && erdData.entities ? erdData.entities : {};
+                    
                     // Prepare initial data
-                    let nodes = Object.entries(erdData.entities).map(function(entry) {
+                    let nodes = Object.entries(entities).map(function(entry) {
                         const name = entry[0];
                         const data = entry[1];
                         const fieldCount = data.fields.length || 1;
@@ -332,11 +359,11 @@ export class EntityVisualizer {
                     
                     // Prepare link data
                     let links = [];
-                    Object.entries(erdData.entities).forEach(function(entry) {
+                    Object.entries(entities).forEach(function(entry) {
                         const sourceName = entry[0];
                         const sourceData = entry[1];
-                        sourceData.relations.forEach(function(rel) {
-                            if (erdData.entities[rel.targetEntity]) {
+                        (sourceData.relations || []).forEach(function(rel) {
+                            if (entities[rel.targetEntity]) {
                                 links.push({
                                     source: sourceName,
                                     target: rel.targetEntity,
@@ -659,8 +686,11 @@ export class EntityVisualizer {
                         });
                     });
 
-                    // Initial render
-                    render();
+                    // Initial render - delay one frame so webview has layout dimensions
+                    requestAnimationFrame(function() {
+                        updateSize();
+                        render();
+                    });
                 })();
             </script>
         </body>
