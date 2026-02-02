@@ -372,11 +372,6 @@
           "command": "extension.createProject",
           "group": "navigation",
           "when": "explorerViewletVisible && !inputFocus"
-        },
-        {
-          "command": "extension.createProject",
-          "group": "navigation",
-          "when": "explorerResourceIsFolder"
         }
       ],
       "editor/context": [

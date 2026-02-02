@@ -23,7 +23,7 @@ export async function addLoggerDebugCommand() {
 
     if (loggerAdded === null) {
       vscode.window.showErrorMessage(
-        "Could not determine where to add logger in the class"
+        "Could not determine where to add logger in the class",
       );
       return;
     }
@@ -41,7 +41,7 @@ export async function addLoggerDebugCommand() {
     });
 
     vscode.window.showInformationMessage(
-      `Logger debug statement added for: ${functionName}`
+      `Logger debug statement added for: ${functionName}`,
     );
   } catch (error: any) {
     vscode.window.showErrorMessage(`Error: ${error.message}`);
@@ -50,17 +50,17 @@ export async function addLoggerDebugCommand() {
 
 async function getCurrentFunctionName(
   editor: vscode.TextEditor,
-  position: vscode.Position
+  position: vscode.Position,
 ): Promise<string> {
   const document = editor.document;
   let currentLine = position.line;
   while (currentLine >= 0) {
     const lineText = document.lineAt(currentLine).text;
     const functionMatch = lineText.match(
-      /(public|private|protected)?\s*(async)?\s*(\w+)\s*\([^)]*\)/
+      /(public|private|protected)?\s*(async)?\s*(\w+)\s*\([^)]*\)/,
     );
     const arrowFunctionMatch = lineText.match(
-      /(public|private|protected)?\s*(\w+)\s*=\s*\([^)]*\)\s*=>/
+      /(public|private|protected)?\s*(\w+)\s*=\s*\([^)]*\)\s*=>/,
     );
 
     if (functionMatch && functionMatch[3]) {
@@ -77,7 +77,7 @@ async function getCurrentFunctionName(
 
 async function ensureLoggerExists(
   editor: vscode.TextEditor,
-  className: string
+  className: string,
 ): Promise<boolean | null> {
   const document = editor.document;
   const text = document.getText();
@@ -101,123 +101,31 @@ async function ensureLoggerExists(
 
 async function addLoggerToClass(
   editor: vscode.TextEditor,
-  className: string
+  className: string,
 ): Promise<boolean | null> {
   const document = editor.document;
   const text = document.getText();
   const classMatch = text.match(/class\s+(\w+)/);
-  if (!classMatch) {
+  if (!classMatch || !classMatch.index) {
     return null;
   }
 
-  const constructorMatch = text.match(/(constructor\s*\([^)]*\)\s*{)/);
-
-  if (constructorMatch) {
-    return await addLoggerToConstructor(editor, constructorMatch[1], className);
-  } else {
-    return await createConstructorWithLogger(editor, className);
-  }
-}
-
-async function addLoggerToConstructor(
-  editor: vscode.TextEditor,
-  constructorLine: string,
-  className: string
-): Promise<boolean> {
-  const document = editor.document;
-  const text = document.getText();
-
-  const constructorIndex = text.indexOf(constructorLine);
-  if (constructorIndex === -1) {
-    return false;
-  }
-
-  const position = document.positionAt(constructorIndex);
-  const line = document.lineAt(position.line);
-
-  if (line.text.includes("logger")) {
-    return true;
-  }
-
-  await editor.edit((editBuilder) => {
-    let parenCount = 0;
-    let foundClosing = false;
-    let currentPos = position;
-
-    while (currentPos.line < document.lineCount && !foundClosing) {
-      const lineText = document.lineAt(currentPos.line).text;
-
-      for (let i = 0; i < lineText.length; i++) {
-        if (lineText[i] === "(") parenCount++;
-        if (lineText[i] === ")") {
-          parenCount--;
-          if (parenCount === 0) {
-            const charPos = new vscode.Position(currentPos.line, i);
-            const constructorParams = lineText
-              .substring(lineText.indexOf("(") + 1, i)
-              .trim();
-
-            if (constructorParams.length > 0) {
-              editBuilder.insert(charPos, `, private readonly logger: Logger`);
-            } else {
-              editBuilder.insert(charPos, `private readonly logger: Logger`);
-            }
-
-            foundClosing = true;
-            break;
-          }
-        }
-      }
-
-      if (!foundClosing) {
-        currentPos = new vscode.Position(currentPos.line + 1, 0);
-      }
-    }
-  });
-
-  return true;
-}
-
-async function createConstructorWithLogger(
-  editor: vscode.TextEditor,
-  className: string
-): Promise<boolean | null> {
-  const document = editor.document;
-  const text = document.getText();
-  const classMatch = text.match(/class\s+\w+\s*{/);
-  if (!classMatch) {
+  const openBraceIndex = text.indexOf("{", classMatch.index);
+  if (openBraceIndex === -1) {
     return null;
   }
 
-  const classIndex = text.indexOf(classMatch[0]);
-  const position = document.positionAt(classIndex + classMatch[0].length);
-  let insertLine = position.line;
-  let foundInsertionPoint = false;
+  const insertPosition = document.positionAt(openBraceIndex + 1);
+  const classLine = document.positionAt(classMatch.index).line;
+  const baseIndentation = getIndentationAtLine(document, classLine);
 
-  while (insertLine < document.lineCount && !foundInsertionPoint) {
-    const lineText = document.lineAt(insertLine).text.trim();
-
-    if (
-      lineText.length > 0 &&
-      !lineText.startsWith("//") &&
-      !lineText.startsWith("*")
-    ) {
-      foundInsertionPoint = true;
-      break;
-    }
-    insertLine++;
-  }
-
-  if (!foundInsertionPoint) {
-    insertLine = position.line + 1;
-  }
+  // Try to detect if the class uses tabs or spaces
+  const indentType = text.includes("\t") ? "\t" : "  ";
+  const innerIndentation = baseIndentation + indentType;
 
   await editor.edit((editBuilder) => {
-    const insertPosition = new vscode.Position(insertLine, 0);
-    const indentation = getIndentationAtLine(document, insertLine);
-
-    const constructorCode = `\n${indentation}constructor(private readonly logger: Logger) {}\n`;
-    editBuilder.insert(insertPosition, constructorCode);
+    const loggerProperty = `\n${innerIndentation}private readonly logger = new Logger(${className}.name);\n`;
+    editBuilder.insert(insertPosition, loggerProperty);
   });
 
   return true;
@@ -225,7 +133,7 @@ async function createConstructorWithLogger(
 
 function getIndentationAtLine(
   document: vscode.TextDocument,
-  line: number
+  line: number,
 ): string {
   const lineText = document.lineAt(line).text;
   const indentationMatch = lineText.match(/^(\s*)/);
