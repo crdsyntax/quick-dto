@@ -248,22 +248,35 @@ function inferReturnTypeFromFunctionBody(
     let hasMultipleReturnTypes = false;
     const returnTypes = new Set<string>();
 
+    const isFunctionLike = (node: any) =>
+      tsLib.isMethodDeclaration(node) ||
+      tsLib.isFunctionDeclaration(node) ||
+      tsLib.isFunctionExpression(node) ||
+      tsLib.isArrowFunction(node);
+
+    const matchesFunctionName = (node: any) => {
+      if (!node.name || !tsLib.isIdentifier(node.name)) {
+        return functionName.length === 0;
+      }
+      return node.name.text === functionName;
+    };
+
     const visit = (node: any) => {
       if (!node) return;
 
       try {
-        if (
-          tsLib.isMethodDeclaration(node) ||
-          tsLib.isFunctionDeclaration(node) ||
-          tsLib.isFunctionExpression(node) ||
-          tsLib.isArrowFunction(node)
-        ) {
+        if (isFunctionLike(node)) {
           const start = sourceFile.getLineAndCharacterOfPosition(
             node.getStart()
           );
           const end = sourceFile.getLineAndCharacterOfPosition(node.getEnd());
 
-          if (cursorLine >= start.line && cursorLine <= end.line && node.body) {
+          if (
+            cursorLine >= start.line &&
+            cursorLine <= end.line &&
+            node.body &&
+            matchesFunctionName(node)
+          ) {
             tsLib.forEachChild(node.body, (child: any) => {
               scanForReturn(child, returnTypes);
             });
@@ -279,6 +292,9 @@ function inferReturnTypeFromFunctionBody(
       if (!node) return;
 
       try {
+        if (isFunctionLike(node)) {
+          return;
+        }
         if (tsLib.isReturnStatement(node)) {
           foundReturn = true;
 

@@ -30,6 +30,26 @@ export interface NodePosition {
   y: number;
 }
 
+export interface BendPoint {
+  x: number;
+  y: number;
+}
+
+export interface CustomRelationData {
+  customLabel?: string;
+  bendPoint?: BendPoint;
+  anchorPoints?: BendPoint[];
+}
+
 export interface SavedPositions {
   [entityName: string]: NodePosition;
+}
+
+export interface SavedRelations {
+  [relationKey: string]: CustomRelationData;
+}
+
+export interface SavedDiagramState {
+  positions: SavedPositions;
+  relations: SavedRelations;
 }

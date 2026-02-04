@@ -3,7 +3,7 @@ import {
   generateErdData,
   generateErdDataForEntities,
 } from "../generators/er.generator";
-import { SavedPositions } from "../types/erd-types";
+import { SavedDiagramState, SavedPositions } from "../types/erd-types";
 
 export class EntityVisualizer {
   public static currentPanel: EntityVisualizer | undefined;
@@ -29,17 +29,14 @@ export class EntityVisualizer {
     this._panel.webview.onDidReceiveMessage(
       (message) => {
         switch (message.type) {
-          case "savePositions":
-            this._savePositions(message.positions);
+          case "saveState":
+            this._saveState(message.state);
             break;
           case "error":
             vscode.window.showErrorMessage(message.message);
             break;
           case "copyToClipboard":
             vscode.env.clipboard.writeText(message.text);
-            vscode.window.showInformationMessage(
-              "Diagrama copiado al portapapeles (formato Markdown/Mermaid).",
-            );
             break;
         }
       },
@@ -60,14 +57,28 @@ export class EntityVisualizer {
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
 
-    // Generate ERD data
+    // Generate ERD data with progress indicator
     let erdData;
     try {
-      if (entityList && entityList.length > 0) {
-        erdData = await generateErdDataForEntities(rootPath, entityList, strict);
-      } else {
-        erdData = await generateErdData(rootPath, entityName);
-      }
+      erdData = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Generating ERD",
+          cancellable: false,
+        },
+        async (progress) => {
+          progress.report({ message: "Analyzing entities..." });
+          if (entityList && entityList.length > 0) {
+            return await generateErdDataForEntities(
+              rootPath,
+              entityList,
+              strict,
+            );
+          } else {
+            return await generateErdData(rootPath, entityName);
+          }
+        },
+      );
     } catch (err) {
       console.error("ERD generation error:", err);
       vscode.window.showErrorMessage(
@@ -126,25 +137,25 @@ export class EntityVisualizer {
     this._rootPath = rootPath;
     this._panel.title = `ERD: ${entityName}`;
 
-    // Load saved positions
-    const savedPositions = this._loadPositions();
+    // Load saved state
+    const savedState = this._loadState();
 
-    this._panel.webview.html = this._getHtmlForWebview(erdData, savedPositions);
+    this._panel.webview.html = this._getHtmlForWebview(erdData, savedState);
   }
 
-  private _savePositions(positions: SavedPositions) {
-    const key = `erd.positions.${this._entityName}`;
-    this._context.globalState.update(key, positions);
+  private _saveState(state: SavedDiagramState) {
+    const key = `erd.state.${this._entityName}`;
+    this._context.globalState.update(key, state);
   }
 
-  private _loadPositions(): SavedPositions {
-    const key = `erd.positions.${this._entityName}`;
-    return this._context.globalState.get(key, {});
+  private _loadState(): SavedDiagramState {
+    const key = `erd.state.${this._entityName}`;
+    return this._context.globalState.get(key, { positions: {}, relations: {} });
   }
 
-  private _getHtmlForWebview(erdData: any, savedPositions: SavedPositions) {
+  private _getHtmlForWebview(erdData: any, savedState: SavedDiagramState) {
     const erdDataJson = JSON.stringify(erdData);
-    const savedPositionsJson = JSON.stringify(savedPositions);
+    const savedStateJson = JSON.stringify(savedState);
 
     return `<!DOCTYPE html>
         <html lang="en">
@@ -250,13 +261,34 @@ export class EntityVisualizer {
                     fill: none;
                     stroke: var(--vscode-terminal-ansiCyan);
                     stroke-width: 2;
-                    marker-end: url(#arrowhead);
                 }
                 
                 .relation-label {
                     fill: var(--vscode-descriptionForeground);
                     font-size: 11px;
                     text-anchor: middle;
+                    cursor: move;
+                    user-select: none;
+                }
+
+                .relation-label:hover {
+                    fill: var(--vscode-focusBorder);
+                    font-weight: bold;
+                }
+
+                #edit-overlay {
+                    position: absolute;
+                    display: none;
+                    z-index: 2000;
+                }
+
+                #edit-input {
+                    background: var(--vscode-input-background);
+                    color: var(--vscode-input-foreground);
+                    border: 1px solid var(--vscode-input-border);
+                    padding: 2px 4px;
+                    font-size: 11px;
+                    outline: none;
                 }
 
                 .delete-btn {
@@ -270,13 +302,67 @@ export class EntityVisualizer {
                 .delete-btn:hover {
                     opacity: 1;
                 }
+
+                .anchor-point {
+                    fill: var(--vscode-terminal-ansiCyan);
+                    stroke: var(--vscode-editor-background);
+                    stroke-width: 1;
+                    cursor: move;
+                }
+
+                .anchor-point:hover {
+                    fill: var(--vscode-focusBorder);
+                    stroke-width: 2;
+                }
+
+                #loading-overlay {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: var(--vscode-editor-background);
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 5000;
+                    transition: opacity 0.3s ease;
+                }
+
+                .spinner {
+                    width: 40px;
+                    height: 40px;
+                    border: 4px solid var(--vscode-progressBar-background);
+                    border-top: 4px solid transparent;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin-bottom: 16px;
+                }
+
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+
+                .loading-text {
+                    font-size: 14px;
+                    color: var(--vscode-descriptionForeground);
+                }
             </style>
         </head>
         <body>
+            <div id="loading-overlay">
+                <div class="spinner"></div>
+                <div class="loading-text">Processing ERD...</div>
+            </div>
             <div id="controls">
                 <button id="resetBtn">Reset Layout</button>
                 <button id="exportBtn">Export SVG</button>
                 <button id="copyBtn">Copy Markdown</button>
+            </div>
+            <div id="edit-overlay">
+                <input type="text" id="edit-input">
             </div>
             <svg id="diagram"></svg>
             
@@ -284,7 +370,9 @@ export class EntityVisualizer {
                 (function() {
                     const vscode = acquireVsCodeApi();
                     const erdData = ${erdDataJson};
-                    const savedPositions = ${savedPositionsJson};
+                    const savedState = ${savedStateJson} || { positions: {}, relations: {} };
+                    const savedPositions = savedState.positions || {};
+                    const savedRelations = savedState.relations || {};
                     
                     // Configuration
                     const config = {
@@ -309,18 +397,39 @@ export class EntityVisualizer {
                     }
                     window.addEventListener("resize", updateSize);
                     
-                    // Create arrow marker
-                    svg.append("defs").append("marker")
-                        .attr("id", "arrowhead")
-                        .attr("viewBox", "0 -5 10 10")
-                        .attr("refX", 8)
-                        .attr("refY", 0)
-                        .attr("markerWidth", 6)
-                        .attr("markerHeight", 6)
-                        .attr("orient", "auto")
-                        .append("path")
-                        .attr("d", "M0,-5L10,0L0,5")
-                        .attr("fill", "var(--vscode-terminal-ansiCyan)");
+                    // Create markers
+                    const defs = svg.append("defs");
+                    
+                    function createMarker(id, path, refX, color) {
+                        defs.append("marker")
+                            .attr("id", id)
+                            .attr("viewBox", "0 -10 12 20")
+                            .attr("refX", refX)
+                            .attr("refY", 0)
+                            .attr("markerWidth", 10)
+                            .attr("markerHeight", 10)
+                            .attr("orient", "auto")
+                            .append("path")
+                            .attr("d", path)
+                            .attr("fill", "none")
+                            .attr("stroke", color || "var(--vscode-terminal-ansiCyan)")
+                            .attr("stroke-width", 1.5);
+                    }
+
+                    // Crow's foot markers
+                    // Target side (end) - Node is at the right (larger X)
+                    createMarker("marker-one-end", "M 4,-6 L 4,6 M 8,-6 L 8,6", 10);
+                    // Many: fork opening towards the node. Anchor at 10 (edge), Mouth at 10, Tip at 2.
+                    createMarker("marker-many-end", "M 2,0 L 10,-6 M 2,0 L 10,6", 10);
+                    // Optional Many: circle and fork. Tip at 6, Mouth at 10, Circle at 2-5.
+                    createMarker("marker-opt-many-end", "M 6,0 L 10,-6 M 6,0 L 10,6 M 2,0 C 2,-3 5,-3 5,0 C 5,3 2,3 2,0", 10);
+                    
+                    // Source side (start) - Node is at the left (smaller X)
+                    createMarker("marker-one-start", "M 4,-6 L 4,6 M 8,-6 L 8,6", 2);
+                    // Many: fork opening towards the node. Anchor at 2 (edge), Mouth at 2, Tip at 10.
+                    createMarker("marker-many-start", "M 10,0 L 2,-6 M 10,0 L 2,6", 2);
+                    // Optional Many: circle and fork. Tip at 6, Mouth at 2, Circle at 7-10.
+                    createMarker("marker-opt-many-start", "M 6,0 L 2,-6 M 6,0 L 2,6 M 10,0 C 10,-3 7,-3 7,0 C 7,3 10,3 10,0", 2);
                     
                     // Create container for zoom/pan
                     const container = svg.append("g");
@@ -335,6 +444,7 @@ export class EntityVisualizer {
                     svg.call(zoom);
 
                     const linkGroup = container.append("g").attr("class", "links");
+                    const anchorGroup = container.append("g").attr("class", "anchors");
                     const nodeGroup = container.append("g").attr("class", "nodes");
                     
                     // Guard: ensure entities exists
@@ -359,18 +469,37 @@ export class EntityVisualizer {
                     
                     // Prepare link data
                     let links = [];
+                    const linkPairCounts = {};
+                    
                     Object.entries(entities).forEach(function(entry) {
                         const sourceName = entry[0];
                         const sourceData = entry[1];
                         (sourceData.relations || []).forEach(function(rel) {
                             if (entities[rel.targetEntity]) {
+                                const pairKey = [sourceName, rel.targetEntity].sort().join('-');
+                                const index = linkPairCounts[pairKey] || 0;
+                                linkPairCounts[pairKey] = index + 1;
+                                
+                                const relKey = sourceName + "->" + rel.targetEntity + ":" + rel.propertyName;
+                                const customData = savedRelations[relKey] || {};
+                                
                                 links.push({
+                                    id: relKey,
                                     source: sourceName,
                                     target: rel.targetEntity,
                                     type: rel.type,
+                                    propertyName: rel.propertyName,
+                                    pairKey: pairKey,
+                                    linkIndex: index,
+                                    customLabel: customData.customLabel,
+                                    anchorPoints: customData.anchorPoints || (customData.bendPoint ? [customData.bendPoint] : [])
                                 });
                             }
                         });
+                    });
+                    
+                    links.forEach(l => {
+                        l.totalInPair = linkPairCounts[l.pairKey];
                     });
 
                     function deleteNode(nodeId) {
@@ -406,7 +535,31 @@ export class EntityVisualizer {
                             .attr("class", "relation-path");
                         
                         linkEnter.append("text")
-                            .attr("class", "relation-label");
+                            .attr("class", "relation-label")
+                            .on("dblclick", function(e, d) {
+                                e.stopPropagation();
+                                showLabelEditor(e, d);
+                            })
+                            .call(d3.drag()
+                                .on("start", function(e) { e.sourceEvent.stopPropagation(); })
+                                .on("drag", function(e, d) {
+                                    const transform = d3.zoomTransform(svg.node());
+                                    const point = transform.invert([e.sourceEvent.clientX, e.sourceEvent.clientY]);
+                                    d.bendPoint = { x: point[0], y: point[1] };
+                                    render();
+                                })
+                                .on("end", saveState)
+                            );
+
+                        linkEnter.on("click", function(e, d) {
+                            if (e.defaultPrevented) return;
+                            const transform = d3.zoomTransform(svg.node());
+                            const point = transform.invert([e.clientX, e.clientY]);
+                            if (!d.anchorPoints) d.anchorPoints = [];
+                            d.anchorPoints.push({ x: point[0], y: point[1] });
+                            render();
+                            saveState();
+                        });
                         
                         const allLinks = linkEnter.merge(linkSelection);
 
@@ -523,31 +676,233 @@ export class EntityVisualizer {
                             .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
 
                          updateLinks(allLinks, nodeEnter.merge(nodeSelection));
+                         updateAnchors(allLinks);
+
+                         // Hide loading overlay
+                         const loadingOverlay = document.getElementById("loading-overlay");
+                         if (loadingOverlay) {
+                             loadingOverlay.style.opacity = "0";
+                             setTimeout(() => {
+                                 loadingOverlay.style.display = "none";
+                             }, 300);
+                         }
+                    }
+                    
+                    function updateAnchors(linksSelection) {
+                        const allAnchorsData = [];
+                        linksSelection.each(function(link) {
+                            (link.anchorPoints || []).forEach((p, i) => {
+                                allAnchorsData.push({
+                                    link: link,
+                                    point: p,
+                                    index: i
+                                });
+                            });
+                        });
+
+                        const anchorSelection = anchorGroup.selectAll(".anchor-point")
+                            .data(allAnchorsData, d => d.link.id + "-" + d.index);
+
+                        anchorSelection.exit().remove();
+
+                        const anchorEnter = anchorSelection.enter()
+                            .append("circle")
+                            .attr("class", "anchor-point")
+                            .attr("r", 5)
+                            .on("contextmenu", function(e, d) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                d.link.anchorPoints.splice(d.index, 1);
+                                render();
+                                saveState();
+                            })
+                            .call(d3.drag()
+                                .on("start", function(e) { e.sourceEvent.stopPropagation(); })
+                                .on("drag", function(e, d) {
+                                    const transform = d3.zoomTransform(svg.node());
+                                    const point = transform.invert([e.sourceEvent.clientX, e.sourceEvent.clientY]);
+                                    d.point.x = point[0];
+                                    d.point.y = point[1];
+                                    render();
+                                })
+                                .on("end", saveState)
+                            );
+
+                        anchorEnter.merge(anchorSelection)
+                            .attr("cx", d => d.point.x)
+                            .attr("cy", d => d.point.y);
                     }
                     
                     
                     function updateLinks(linksSelection, nodesSelection) {
+                        const markerMap = {
+                            'ManyToOne': { start: 'marker-opt-many-start', end: 'marker-one-end' },
+                            'OneToMany': { start: 'marker-one-start', end: 'marker-opt-many-end' },
+                            'OneToOne': { start: 'marker-one-start', end: 'marker-one-end' },
+                            'ManyToMany': { start: 'marker-opt-many-start', end: 'marker-opt-many-end' }
+                        };
+
                         linksSelection.each(function(d) {
                             const sourceNode = nodes.find(function(n) { return n.id === d.source; });
                             const targetNode = nodes.find(function(n) { return n.id === d.target; });
                             
                             if (!sourceNode || !targetNode) return;
                             
-                            const sx = sourceNode.x + sourceNode.width / 2;
-                            const sy = sourceNode.y + sourceNode.height / 2;
-                            const tx = targetNode.x + targetNode.width / 2;
-                            const ty = targetNode.y + targetNode.height / 2;
+                            // Base centers
+                            let csx = sourceNode.x + sourceNode.width / 2;
+                            let csy = sourceNode.y + sourceNode.height / 2;
+                            let ctx = targetNode.x + targetNode.width / 2;
+                            let cty = targetNode.y + targetNode.height / 2;
+
+                            // Offset for multiple links between same nodes
+                            const offsetStep = 25;
+                            const offset = (d.linkIndex - (d.totalInPair - 1) / 2) * offsetStep;
                             
-                            const midX = (sx + tx) / 2;
-                            const path = "M " + sx + "," + sy + " L " + midX + "," + sy + " L " + midX + "," + ty + " L " + tx + "," + ty;
+                            const dx = Math.abs(csx - ctx);
+                            const dy = Math.abs(csy - cty);
+                            
+                            let sx, sy, tx, ty, path, labelX, labelY;
+
+                            // Clip to edges logic
+                            const getEdgePoint = (node, otherX, otherY, xOffset, yOffset) => {
+                                const nx = node.x + node.width / 2 + (xOffset || 0);
+                                const ny = node.y + node.height / 2 + (yOffset || 0);
+                                
+                                const dx = otherX - nx;
+                                const dy = otherY - ny;
+                                
+                                if (Math.abs(dx) / node.width > Math.abs(dy) / node.height) {
+                                    return [nx + (dx > 0 ? node.width / 2 : -node.width / 2), ny];
+                                } else {
+                                    return [nx, ny + (dy > 0 ? node.height / 2 : -node.height / 2)];
+                                }
+                            };
+
+                            if (d.anchorPoints && d.anchorPoints.length > 0) {
+                                // Use anchor points
+                                let points = [];
+                                
+                                // Source connection
+                                const pStart = getEdgePoint(sourceNode, d.anchorPoints[0].x, d.anchorPoints[0].y);
+                                points.push({ x: pStart[0], y: pStart[1] });
+                                
+                                // Intermediate points
+                                d.anchorPoints.forEach(p => points.push(p));
+                                
+                                // Target connection
+                                const lastAnchor = d.anchorPoints[d.anchorPoints.length - 1];
+                                const pEnd = getEdgePoint(targetNode, lastAnchor.x, lastAnchor.y);
+                                points.push({ x: pEnd[0], y: pEnd[1] });
+                                
+                                path = "M " + points[0].x + "," + points[0].y;
+                                for (let i = 1; i < points.length; i++) {
+                                    path += " L " + points[i].x + "," + points[i].y;
+                                }
+                                
+                                // Position label at the first segment midpoint
+                                labelX = (points[0].x + points[1].x) / 2;
+                                labelY = (points[0].y + points[1].y) / 2 - 10;
+                            } else {
+                                // Default orthogonal-ish path
+                                if (dx > dy) {
+                                    sy = csy + offset;
+                                    ty = cty + offset;
+                                    const midX = (csx + ctx) / 2;
+                                    sx = csx + (ctx > csx ? sourceNode.width / 2 : -sourceNode.width / 2);
+                                    tx = ctx + (csx > ctx ? targetNode.width / 2 : -targetNode.width / 2);
+                                    path = "M " + sx + "," + sy + " L " + midX + "," + sy + " L " + midX + "," + ty + " L " + tx + "," + ty;
+                                    labelX = midX;
+                                    labelY = (sy + ty) / 2 - 10;
+                                } else {
+                                    sx = csx + offset;
+                                    tx = ctx + offset;
+                                    const midY = (csy + cty) / 2;
+                                    sy = csy + (cty > csy ? sourceNode.height / 2 : -sourceNode.height / 2);
+                                    ty = cty + (csy > cty ? targetNode.height / 2 : -targetNode.height / 2);
+                                    path = "M " + sx + "," + sy + " L " + sx + "," + midY + " L " + tx + "," + midY + " L " + tx + "," + ty;
+                                    labelX = (sx + tx) / 2 + 10;
+                                    labelY = midY - 5;
+                                }
+                            }
+                            
+                            const markers = markerMap[d.type] || { start: '', end: '' };
                             
                             d3.select(this).select("path")
-                                .attr("d", path);
+                                .attr("d", path)
+                                .style("marker-start", markers.start ? "url(#" + markers.start + ")" : "")
+                                .style("marker-end", markers.end ? "url(#" + markers.end + ")" : "");
+                            
+                            const label = d.customLabel || d.propertyName || d.type;
                             
                             d3.select(this).select("text")
-                                .attr("x", midX)
-                                .attr("y", (sy + ty) / 2 - 5)
-                                .text(d.type);
+                                .attr("x", labelX)
+                                .attr("y", labelY)
+                                .text(label);
+                        });
+                    }
+
+                    // Label editing logic
+                    let currentEditingLink = null;
+                    const editOverlay = document.getElementById("edit-overlay");
+                    const editInput = document.getElementById("edit-input");
+
+                    function showLabelEditor(event, d) {
+                        currentEditingLink = d;
+                        editOverlay.style.display = "block";
+                        editOverlay.style.left = event.clientX + "px";
+                        editOverlay.style.top = event.clientY + "px";
+                        editInput.value = d.customLabel || d.propertyName || d.type;
+                        editInput.focus();
+                        editInput.select();
+                    }
+
+                    editInput.addEventListener("keydown", function(e) {
+                        if (e.key === "Enter") {
+                            finishEditing();
+                        } else if (e.key === "Escape") {
+                            cancelEditing();
+                        }
+                    });
+
+                    editInput.addEventListener("blur", finishEditing);
+
+                    function finishEditing() {
+                        if (currentEditingLink) {
+                            currentEditingLink.customLabel = editInput.value;
+                            editOverlay.style.display = "none";
+                            currentEditingLink = null;
+                            render();
+                            saveState();
+                        }
+                    }
+
+                    function cancelEditing() {
+                        editOverlay.style.display = "none";
+                        currentEditingLink = null;
+                    }
+
+                    function saveState() {
+                        const positions = {};
+                        nodes.forEach(function(node) {
+                            positions[node.id] = { x: node.x, y: node.y };
+                        });
+
+                        const relations = {};
+                         links.forEach(function(link) {
+                            if (link.customLabel || (link.anchorPoints && link.anchorPoints.length > 0)) {
+                                relations[link.id] = {
+                                    customLabel: link.customLabel,
+                                    anchorPoints: link.anchorPoints
+                                };
+                            }
+                        });
+
+                        vscode.postMessage({
+                            type: 'saveState',
+                            state: {
+                                positions: positions,
+                                relations: relations
+                            }
                         });
                     }
                     
@@ -566,14 +921,7 @@ export class EntityVisualizer {
                     }
                     
                     function dragEnded(event, d) {
-                        const positions = {};
-                        nodes.forEach(function(node) {
-                            positions[node.id] = { x: node.x, y: node.y };
-                        });
-                        vscode.postMessage({
-                            type: 'savePositions',
-                            positions: positions
-                        });
+                        saveState();
                     }
                     
                     // Reset button
@@ -586,15 +934,7 @@ export class EntityVisualizer {
                         });
                         
                         render();
-                        
-                        const positions = {};
-                        nodes.forEach(function(node) {
-                            positions[node.id] = { x: node.x, y: node.y };
-                        });
-                        vscode.postMessage({
-                            type: 'savePositions',
-                            positions: positions
-                        });
+                        saveState();
                     });
                     
                     // Export button
