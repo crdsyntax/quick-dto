@@ -368,10 +368,11 @@ export class HttpTesterPanel {
             await this._handleExportJson(msg.type, msg.collections);
           } else if (msg.command === "saveCollections") {
             await this._saveCollections(msg.collections);
+          } else if (msg.command === "saveFile") {
+            await this._handleSaveFile(msg.data);
           } else if (msg.command.startsWith("socket")) {
             this._handleSocketMessage(msg);
           } else if (msg.command === "getPanelId") {
-            // Responder con el ID del panel
             webview.postMessage({
               command: "panelId",
               panelId: this._id,
@@ -477,6 +478,29 @@ export class HttpTesterPanel {
     const { HttpTesterSidebarProvider } = require("./http-tester-sidebar.view");
     if (HttpTesterSidebarProvider.instance) {
       HttpTesterSidebarProvider.instance.refreshCollections();
+    }
+  }
+
+  private async _handleSaveFile(data: { base64: string; fileName?: string; mimeType?: string; }) {
+    try {
+      const defaultName = data.fileName || "download";
+      const fileUri = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(defaultName),
+      });
+      if (!fileUri) {
+        return;
+      }
+      const buffer = Buffer.from(data.base64, "base64");
+      fs.writeFileSync(fileUri.fsPath, buffer);
+      vscode.window.showInformationMessage(
+        `Archivo guardado en ${fileUri.fsPath}`
+      );
+    } catch (err: any) {
+      vscode.window.showErrorMessage(
+        `Error al guardar el archivo: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
     }
   }
 

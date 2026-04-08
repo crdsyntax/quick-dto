@@ -48,6 +48,11 @@
           "id": "dto-properties-panel",
           "title": "DTO Properties",
           "icon": "images/sequence.svg"
+        },
+        {
+          "id": "vaultNotesContainer",
+          "title": "Vault Notes",
+          "icon": "images/entity.svg"
         }
       ]
     },
@@ -81,6 +86,13 @@
           "name": "HTTP Tester",
           "type": "webview",
           "icon": "images/socket.svg"
+        }
+      ],
+      "vaultNotesContainer": [
+        {
+          "id": "vaultNotesView",
+          "name": "Vault Notes",
+          "type": "webview"
         }
       ]
     },
@@ -270,6 +282,16 @@
         "title": "Select Workspace Folder for Entity View",
         "category": "NestJS Tools",
         "icon": "$(folder-opened)"
+      },
+      {
+        "command": "nest-tools.saveVaultNote",
+        "title": "Vault: Guardar anotación",
+        "category": "NestJS Tools"
+      },
+      {
+        "command": "nest-tools.readVaultNotes",
+        "title": "Vault: Leer anotaciones por clave",
+        "category": "NestJS Tools"
       }
     ],
     "menus": {

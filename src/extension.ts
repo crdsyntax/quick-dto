@@ -32,6 +32,12 @@ import { generateCollectionsFromControllerCommand } from "./commands/generate-co
 import { HttpTesterPanel } from "./views/http-tester.view";
 import { handleCreateProject } from "./commands/project-tools.command";
 import { openFlowchartEditorCommand } from "./commands/flowchart.command";
+import { VaultViewProvider } from "./views/vault.view";
+import {
+  initializeVault,
+  readNotesFlow,
+  saveNoteFlow,
+} from "./commands/vault-notes.command";
 
 const ENTITY_VIEW_FOLDER_KEY = "entityView.selectedFolder";
 
@@ -146,6 +152,14 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.registerWebviewViewProvider(
       HttpTesterSidebarProvider.viewId,
       httpTesterProvider,
+    ),
+  );
+
+  const vaultProvider = new VaultViewProvider(context.extensionUri, context);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      VaultViewProvider.viewId,
+      vaultProvider,
     ),
   );
 
@@ -401,6 +415,12 @@ export function activate(context: vscode.ExtensionContext) {
         );
       }
     }),
+    vscode.commands.registerCommand("nest-tools.saveVaultNote", () =>
+      saveNoteFlow(context),
+    ),
+    vscode.commands.registerCommand("nest-tools.readVaultNotes", () =>
+      readNotesFlow(context),
+    ),
   );
 
   context.subscriptions.push(
@@ -411,6 +431,8 @@ export function activate(context: vscode.ExtensionContext) {
       },
     ),
   );
+
+  initializeVault(context);
 
   context.subscriptions.push(
     vscode.commands.registerCommand("nest-tools.triggerReturnType", () => {

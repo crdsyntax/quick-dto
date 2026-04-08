@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vault Notes</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 10px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background-color: transparent;
+        color: var(--vscode-editor-foreground);
+      }
+
+      .vault-container {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        height: 100%;
+      }
+
+      .vault-header {
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 2px;
+      }
+
+      label {
+        font-size: 11px;
+        text-transform: uppercase;
+        opacity: 0.8;
+      }
+
+      input[type="text"],
+      textarea,
+      select {
+        width: 100%;
+        border-radius: 4px;
+        border: 1px solid var(--vscode-input-border, #3f3d56);
+        padding: 4px 6px;
+        font-size: 12px;
+        background-color: var(--vscode-input-background);
+        color: var(--vscode-input-foreground);
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 60px;
+        max-height: 120px;
+      }
+
+      button {
+        border-radius: 4px;
+        border: none;
+        padding: 4px 8px;
+        font-size: 11px;
+        cursor: pointer;
+        background-color: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+      }
+
+      button:hover {
+        background-color: var(--vscode-button-hoverBackground);
+      }
+
+      .btn-secondary {
+        background-color: var(--vscode-button-secondaryBackground, #374151);
+        color: var(--vscode-button-secondaryForeground, #e5e7eb);
+      }
+
+      .btn-danger {
+        background-color: #b91c1c;
+        color: #f9fafb;
+      }
+
+      .row {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
+
+      .row > * {
+        flex: 1;
+      }
+
+      .notes-list {
+        border-radius: 4px;
+        border: 1px solid var(--vscode-input-border, #3f3d56);
+        padding: 4px;
+        max-height: 220px;
+        overflow-y: auto;
+        background-color: var(--vscode-editor-background, #111827);
+        font-size: 12px;
+      }
+
+      .note-item {
+        border-radius: 4px;
+        border: 1px solid rgba(148, 163, 184, 0.5);
+        padding: 4px 6px;
+        margin-bottom: 4px;
+      }
+
+      .note-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 11px;
+        opacity: 0.9;
+        margin-bottom: 2px;
+      }
+
+      .note-body {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .empty-state {
+        font-size: 11px;
+        opacity: 0.7;
+        font-style: italic;
+      }
+
+      .section-title {
+        font-size: 12px;
+        font-weight: 600;
+        margin-top: 6px;
+        margin-bottom: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="vault-container">
+      <div>
+        <div class="vault-header">Vault Notes</div>
+        <div class="row" style="margin-top: 4px">
+          <div>
+            <label for="vault-key-input">Clave actual</label>
+            <input
+              type="text"
+              id="vault-key-input"
+              placeholder="p.ej. cliente-XYZ, sprint-45"
+            />
+          </div>
+        </div>
+        <div class="row" style="margin-top: 4px">
+          <div>
+            <label for="vault-key-select">Baúles existentes</label>
+            <select id="vault-key-select">
+              <option value="">(no hay baúles todavía)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row" style="margin-top: 4px">
+          <button id="btn-load-key">Cargar baúl</button>
+          <button id="btn-delete-vault" class="btn-danger">
+            Eliminar baúl
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">Nueva anotación</div>
+        <textarea
+          id="new-note-text"
+          placeholder="Escribe aquí la anotación para la clave actual..."
+        ></textarea>
+        <div class="row" style="margin-top: 4px; justify-content: flex-end">
+          <button id="btn-add-note">Guardar anotación</button>
+        </div>
+      </div>
+
+      <div style="flex: 1; display: flex; flex-direction: column; min-height: 80px">
+        <div class="section-title">Anotaciones del baúl</div>
+        <div id="notes-container" class="notes-list">
+          <div class="empty-state">
+            Selecciona o crea una clave para ver sus anotaciones.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // @ts-nocheck
+      const vscode = acquireVsCodeApi();
+
+      const keyInput = document.getElementById("vault-key-input");
+      const keySelect = document.getElementById("vault-key-select");
+      const btnLoadKey = document.getElementById("btn-load-key");
+      const btnDeleteVault = document.getElementById("btn-delete-vault");
+      const newNoteText = document.getElementById("new-note-text");
+      const btnAddNote = document.getElementById("btn-add-note");
+      const notesContainer = document.getElementById("notes-container");
+
+      let currentKey = "";
+
+      function postMessage(message) {
+        vscode.postMessage(message);
+      }
+
+      function renderVaultState(state) {
+        const { keys, selectedKey, notes } = state;
+
+        // Actualizar select
+        keySelect.innerHTML = "";
+        if (!keys || keys.length === 0) {
+          const opt = document.createElement("option");
+          opt.value = "";
+          opt.textContent = "(no hay baúles todavía)";
+          keySelect.appendChild(opt);
+        } else {
+          const emptyOpt = document.createElement("option");
+          emptyOpt.value = "";
+          emptyOpt.textContent = "(selecciona un baúl)";
+          keySelect.appendChild(emptyOpt);
+
+          keys.forEach((k) => {
+            const opt = document.createElement("option");
+            opt.value = k;
+            opt.textContent = k;
+            keySelect.appendChild(opt);
+          });
+        }
+
+        currentKey = selectedKey || "";
+        keyInput.value = currentKey;
+        if (currentKey && Array.from(keySelect.options).some((o) => o.value === currentKey)) {
+          keySelect.value = currentKey;
+        } else {
+          keySelect.value = "";
+        }
+
+        // Actualizar notas
+        notesContainer.innerHTML = "";
+        if (!currentKey) {
+          const div = document.createElement("div");
+          div.className = "empty-state";
+          div.textContent =
+            "No hay baúl seleccionado. Escribe una clave y guarda una anotación o selecciona un baúl existente.";
+          notesContainer.appendChild(div);
+          return;
+        }
+
+        if (!notes || notes.length === 0) {
+          const div = document.createElement("div");
+          div.className = "empty-state";
+          div.textContent = `El baúl "${currentKey}" no tiene anotaciones todavía.`;
+          notesContainer.appendChild(div);
+          return;
+        }
+
+        notes.forEach((note, index) => {
+          const item = document.createElement("div");
+          item.className = "note-item";
+
+          const header = document.createElement("div");
+          header.className = "note-header";
+
+          const title = document.createElement("span");
+          title.textContent = `#${index + 1}`;
+
+          const btnDelete = document.createElement("button");
+          btnDelete.textContent = "Eliminar";
+          btnDelete.className = "btn-secondary";
+          btnDelete.addEventListener("click", () => {
+            if (!currentKey) return;
+            postMessage({
+              command: "deleteNote",
+              key: currentKey,
+              index,
+            });
+          });
+
+          header.appendChild(title);
+          header.appendChild(btnDelete);
+
+          const body = document.createElement("div");
+          body.className = "note-body";
+          body.textContent = note;
+
+          item.appendChild(header);
+          item.appendChild(body);
+          notesContainer.appendChild(item);
+        });
+      }
+
+      btnLoadKey.addEventListener("click", () => {
+        const key = keyInput.value.trim() || keySelect.value.trim();
+        if (!key) {
+          return;
+        }
+        postMessage({ command: "loadVault", key });
+      });
+
+      keySelect.addEventListener("change", () => {
+        const selected = keySelect.value.trim();
+        if (selected) {
+          keyInput.value = selected;
+        }
+      });
+
+      btnAddNote.addEventListener("click", () => {
+        const key = keyInput.value.trim() || keySelect.value.trim();
+        const note = newNoteText.value;
+        if (!key || !note.trim()) {
+          return;
+        }
+        postMessage({ command: "addNote", key, note });
+        newNoteText.value = "";
+      });
+
+      btnDeleteVault.addEventListener("click", () => {
+        const key = keyInput.value.trim() || keySelect.value.trim();
+        if (!key) return;
+        postMessage({ command: "deleteVault", key });
+      });
+
+      window.addEventListener("message", (event) => {
+        const message = event.data;
+        switch (message.command) {
+          case "vaultState":
+            renderVaultState(message);
+            break;
+          case "error":
+            // Opcional: podríamos mostrar el error en la UI
+            console.error("Vault error:", message.message);
+            break;
+        }
+      });
+
+      // Solicitar estado inicial
+      postMessage({ command: "ready" });
+    </script>
+  </body>
+</html>
+

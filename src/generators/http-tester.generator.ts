@@ -22,7 +22,11 @@ export interface HttpResponse {
   data: any;
   time: number;
   size: number;
+  // new properties for file downloads
+  isBinary?: boolean;
+  fileName?: string;
 }
+
 export interface HttpCollection {
   name: string;
   type: "http" | "socket";
@@ -277,6 +281,7 @@ export class HttpTesterGenerator {
         requestData = hasBody ? request.body : undefined;
       }
 
+      // always request an arraybuffer so we can handle binary downloads
       const config: AxiosRequestConfig = {
         method: request.method,
         url: request.url,
@@ -285,19 +290,84 @@ export class HttpTesterGenerator {
         data: requestData,
         validateStatus: () => true,
         timeout: 10000,
+        responseType: "arraybuffer",
       };
 
       const startTime = Date.now();
       const response = await axios(config);
       const endTime = Date.now();
 
+      const formattedHeaders = this.formatHeaders(response.headers);
+      const contentType = (formattedHeaders["content-type"] || "").toLowerCase();
+      let responseBody: any = response.data;
+      let isBinary = false;
+      let fileName: string | undefined;
+
+      // attempt to extract filename from content-disposition
+      if (formattedHeaders["content-disposition"]) {
+        fileName = this.getFileNameFromDisposition(
+          formattedHeaders["content-disposition"]
+        );
+      }
+
+      // convert the ArrayBuffer to Buffer for inspection
+      if (response.data && (response.data instanceof ArrayBuffer || Buffer.isBuffer(response.data))) {
+        const buffer = Buffer.from(response.data as ArrayBuffer);
+
+        // determine if the response should be treated as binary or text
+        const textualContent =
+          contentType.startsWith("application/json") ||
+          contentType.startsWith("text/") ||
+          contentType.includes("xml") ||
+          contentType.includes("javascript") ||
+          // if content-type is missing we assume text
+          contentType === "";
+
+        // some known binary prefixes
+        const binaryPrefixes = [
+          "application/octet-stream",
+          "application/pdf",
+          "image/",
+          "audio/",
+          "video/",
+        ];
+        const isKnownBinary = binaryPrefixes.some((p) =>
+          contentType.startsWith(p)
+        );
+
+        if (!isKnownBinary) {
+          // treat as text even if content-type is unusual
+          const text = buffer.toString("utf-8");
+          if (textualContent) {
+            try {
+              responseBody = JSON.parse(text);
+            } catch {
+              responseBody = text;
+            }
+          } else {
+            // if content-type isn't clearly text we still try to parse, otherwise fall back
+            try {
+              responseBody = JSON.parse(text);
+            } catch {
+              responseBody = text;
+            }
+          }
+        } else {
+          // binary payload - return base64 so the webview can download it
+          isBinary = true;
+          responseBody = buffer.toString("base64");
+        }
+      }
+
       return {
         status: response.status,
         statusText: response.statusText,
-        headers: this.formatHeaders(response.headers),
-        data: response.data,
+        headers: formattedHeaders,
+        data: responseBody,
         time: endTime - startTime,
         size: this.calculateResponseSize(response),
+        isBinary,
+        fileName,
       };
     } catch (error: any) {
       throw new Error(`Request failed: ${error.message}`);
@@ -341,20 +411,38 @@ export class HttpTesterGenerator {
 
     if (headers) {
       Object.keys(headers).forEach((key) => {
-        formatted[key] = headers[key];
+        formatted[key.toLowerCase()] = headers[key];
       });
     }
 
     return formatted;
   }
 
+  /**
+   * Extrae el nombre de archivo de un header Content-Disposition si existe.
+   */
+  private getFileNameFromDisposition(disposition: string): string | undefined {
+    try {
+      const match = /filename\*?=(?:UTF-8'')?["']?([^"';\n]+)["']?/.exec(
+        disposition
+      );
+      return match ? match[1] : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   private calculateResponseSize(response: any): number {
     try {
       const headers = JSON.stringify(response.headers);
-      const data =
-        typeof response.data === "string"
-          ? response.data
-          : JSON.stringify(response.data);
+      let data;
+      if (response.data && typeof response.data === "string") {
+        data = response.data;
+      } else if (response.data && response.data instanceof ArrayBuffer) {
+        data = Buffer.from(response.data).toString("binary");
+      } else {
+        data = JSON.stringify(response.data);
+      }
       return new Blob([headers + data]).size;
     } catch {
       return 0;

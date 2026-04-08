@@ -1299,7 +1299,7 @@
             ? "status-3xx"
             : "status-4xx";
 
-        responseHeader.innerHTML = `
+        let headerHtml = `
           <span class="${statusClass}">${response.status} ${
           response.statusText
         }</span>
@@ -1307,7 +1307,40 @@
           response.size
         )}</span>
         `;
-        responseData.textContent = formatResponseData(response.data);
+
+        if (response.fileName) {
+          headerHtml += ` <span style="margin-left:10px; font-style:italic;">${response.fileName}</span>`;
+        }
+
+        responseHeader.innerHTML = headerHtml;
+
+        // clear previous content
+        responseData.innerHTML = "";
+
+        if (response.isBinary) {
+          // show notice and download button
+          const notice = document.createElement("div");
+          notice.style.marginBottom = "10px";
+          notice.textContent = "Archivo binario recibido. Haz clic en descargar.";
+          responseData.appendChild(notice);
+
+          const downloadBtn = document.createElement("button");
+          downloadBtn.textContent = "Descargar";
+          downloadBtn.className = "action-button";
+          downloadBtn.addEventListener("click", () => {
+            vscode.postMessage({
+              command: "saveFile",
+              data: {
+                base64: response.data,
+                fileName: response.fileName,
+                mimeType: response.headers ? response.headers["content-type"] : undefined,
+              },
+            });
+          });
+          responseData.appendChild(downloadBtn);
+        } else {
+          responseData.textContent = formatResponseData(response.data);
+        }
       }
 
       function showError(message) {
