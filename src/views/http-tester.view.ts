@@ -24,9 +24,9 @@ export class HttpTesterPanel {
   private static _context: vscode.ExtensionContext;
   private static readonly COLLECTIONS_STORAGE_KEY = "httpTester.collections";
 
-  // Propiedades de Socket.IO (específicas por panel)
   private socket?: Socket;
   private socketChannel: vscode.OutputChannel;
+  private listenChannel: vscode.OutputChannel;
   private _socketState: SocketTesterState = {
     url: "http://localhost:3000",
     token: "",
@@ -39,6 +39,8 @@ export class HttpTesterPanel {
     text: "Disconnected",
     class: "disconnected",
   };
+
+  private _listenedEvents: Set<string> = new Set();
 
   // ID único para cada panel
   private readonly _id: string;
@@ -56,9 +58,12 @@ export class HttpTesterPanel {
     // Manejar el cierre del panel
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
-    // Inicializar el canal de salida del socket con nombre único
+    // Inicializar los canales de salida del socket con nombres únicos
     this.socketChannel = vscode.window.createOutputChannel(
       `Socket Tester Log #${HttpTesterPanel.panels.length + 1}`
+    );
+    this.listenChannel = vscode.window.createOutputChannel(
+      `Socket Listen Log #${HttpTesterPanel.panels.length + 1}`
     );
 
     // Añadir a la lista de paneles activos
@@ -206,6 +211,9 @@ export class HttpTesterPanel {
 
       // Listener de cualquier evento recibido
       this.socket?.onAny((event, ...args) => {
+        if (this._listenedEvents.has(event)) {
+          return; // Ignore events that are specifically listened to
+        }
         this._postSocketLog(
           `Event: ${event}\nPayload: ${JSON.stringify(args, null, 2)}`,
           "event"
@@ -274,6 +282,31 @@ export class HttpTesterPanel {
     }
   }
 
+  private _listenSocketEvent(eventName: string) {
+    if (!this.socket || !this.socket.connected) {
+      this._postSocketLog("Socket is not connected.", "error");
+      this._panel.webview.postMessage({
+        command: "error",
+        message: "Socket is not connected.",
+        panelId: this._id,
+      });
+      return;
+    }
+
+    this._listenedEvents.add(eventName);
+    this.socket.off(eventName); // Evitar duplicados
+    this.socket.on(eventName, (...args) => {
+      this._panel.webview.postMessage({
+        command: "socketListenLog",
+        eventName: eventName,
+        message: `${JSON.stringify(args, null, 2)}`,
+        panelId: this._id,
+      });
+      this.listenChannel.appendLine(`[LISTEN - ${eventName}] ${JSON.stringify(args)}`);
+    });
+    this._postSocketLog(`Listening to event: ${eventName}`, "info");
+  }
+
   private _handleSocketMessage(msg: any) {
     const { command, data, panelId } = msg;
 
@@ -296,6 +329,9 @@ export class HttpTesterPanel {
         break;
       case "socketEmit":
         this._emitEvent(data);
+        break;
+      case "socketListen":
+        this._listenSocketEvent(data.eventName);
         break;
       case "socketGetInitialState":
         // Envía el estado inicial y el último estatus al abrir la pestaña
@@ -554,6 +590,7 @@ export class HttpTesterPanel {
 
     this._disconnectSocket();
     this.socketChannel.dispose();
+    this.listenChannel.dispose();
 
     while (this._disposables.length) {
       const d = this._disposables.pop();
