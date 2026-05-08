@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>API Tester</title>
     <style>
-      /* * --- Estilos Base y Reset --- */
       * {
         margin: 0;
         padding: 0;
@@ -13,12 +12,10 @@
       }
 
       body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          Oxygen, Ubuntu, sans-serif;
+        font-family: 'Courier New', Courier, monospace;
         padding: 24px;
-        /* Fondo: Índigo Oscuro */
-        background: linear-gradient(135deg, #110f1a 0%, #1b192a 100%);
-        color: #f0f4f8; /* Texto Principal */
+        background: #000000;
+        color: #d1d1d1;
         min-height: 100vh;
       }
 
@@ -35,20 +32,16 @@
       .header h1 {
         font-size: 36px;
         font-weight: 800;
-        /* Gradiente Principal: Violeta */
-        background: linear-gradient(90deg, #a78bfa 0%, #8b5cf6 100%);
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
+        color: #d1d1d1;
         margin-bottom: 8px;
+        text-shadow: 0 0 10px rgba(209, 209, 209, 0.3);
       }
 
       .header p {
-        color: #a6adbb; /* Texto Secundario */
+        color: #888;
         font-size: 15px;
       }
 
-      /* --- LAYOUT (SIDEBAR Y CONTENIDO PRINCIPAL) --- */
       .main-wrapper {
         display: flex;
         gap: 30px;
@@ -58,10 +51,9 @@
         width: 320px;
         flex-shrink: 0;
         padding: 20px;
-        border-radius: 8px;
-        background-color: #1b192a; /* Fondo de Contenedor */
-        border: 1px solid #3f3d56; /* Borde Oscuro */
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+        border-radius: 4px;
+        background-color: #000000;
+        border: 1px solid #333;
         height: calc(100vh - 80px);
         overflow-y: auto;
       }
@@ -69,6 +61,7 @@
       .collections-sidebar h2 {
         font-size: 20px !important;
         font-weight: 700;
+        color: #d1d1d1 !important;
       }
 
       .main-content {
@@ -77,11 +70,11 @@
       }
 
       .collection-controls h3 {
-        color: #a78bfa; /* Violeta Suave */
+        color: #d1d1d1;
         margin-bottom: 15px;
         font-size: 18px;
         font-weight: 700;
-        border-bottom: 2px solid #3f3d56;
+        border-bottom: 1px solid #333;
         padding-bottom: 8px;
       }
 
@@ -92,15 +85,6 @@
         align-items: flex-end;
       }
 
-      /* Ocultar los títulos y separadores de colección viejos */
-      #http-tab > h2:nth-of-type(1),
-      #http-tab > hr:nth-of-type(1),
-      #socket-tab > h2:nth-of-type(2),
-      #socket-tab > hr:nth-of-type(2) {
-        display: none;
-      }
-
-      /* --- INPUTS Y FORMULARIO --- */
       .input-group {
         margin-bottom: 15px;
       }
@@ -109,7 +93,7 @@
         display: block;
         margin-bottom: 6px;
         font-weight: 600;
-        color: #a6adbb;
+        color: #888;
         font-size: 13px;
         text-transform: uppercase;
       }
@@ -122,12 +106,13 @@
       input[type="file"] {
         width: 100%;
         padding: 12px;
-        border: 1px solid #3f3d56;
-        background-color: #110f1a; /* Fondo Input más oscuro */
-        color: #f0f4f8;
-        border-radius: 6px;
-        transition: border-color 0.2s, box-shadow 0.2s;
+        border: 1px solid #333;
+        background-color: #000000;
+        color: #d1d1d1;
+        border-radius: 2px;
+        transition: border-color 0.2s;
         font-size: 14px;
+        font-family: inherit;
       }
 
       input[type="text"]:focus,
@@ -136,8 +121,7 @@
       input[type="number"]:focus,
       input[type="password"]:focus,
       input[type="file"]:focus {
-        border-color: #8b5cf6; /* Violeta de enfoque */
-        box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25);
+        border-color: #666;
         outline: none;
       }
 
@@ -154,63 +138,42 @@
         align-items: center;
       }
 
-      /* --- BOTONES DE ACCIÓN --- */
       .action-button {
         padding: 10px 15px;
-        background-color: #8b5cf6; /* Botón Principal: Violeta */
-        color: #110f1a; /* Texto en botón */
-        border: none;
-        border-radius: 6px;
+        background-color: #d1d1d1;
+        color: #000000;
+        border: 1px solid #d1d1d1;
+        border-radius: 2px;
         cursor: pointer;
         font-weight: 700;
-        transition: background-color 0.2s, transform 0.1s;
+        transition: all 0.2s;
         height: 44px;
         line-height: 1.2;
         display: flex;
         align-items: center;
         justify-content: center;
+        text-transform: uppercase;
+        font-size: 12px;
       }
 
       .action-button:hover {
-        background-color: #7c3aed; /* Violeta más oscuro al hover */
-        transform: translateY(-1px);
-      }
-
-      .action-button:active {
-        transform: translateY(0);
+        background-color: #ffffff;
+        border-color: #ffffff;
       }
 
       .action-button:disabled {
-        background-color: #6b7280; /* Gris opaco */
+        background-color: #444;
+        color: #888;
+        border-color: #444;
         cursor: not-allowed;
-        transform: none;
       }
 
-      /* Botones de colección (Import/Export) */
-      #http-import-json-button,
-      #socket-import-json-button {
-        background-color: #34d399 !important; /* Verde */
-        color: #110f1a;
-      }
-      #http-export-json-button,
-      #socket-export-json-button {
-        background-color: #3b82f6 !important; /* Azul (para un segundo acento funcional) */
-        color: #110f1a;
-      }
-      #http-delete-collection-button,
-      #socket-delete-collection-button {
-        background-color: #ef4444 !important; /* Rojo */
-        color: #f0f4f8;
-      }
-
-      /* --- PARÁMETROS, HEADERS Y FILES (KEY/VALUE ROWS) --- */
       .params-container,
       .headers-container {
         margin-top: 10px;
-        border: 1px solid #3f3d56;
-        border-radius: 6px;
+        border: 1px solid #333;
         padding: 12px;
-        background-color: #1b192a;
+        background-color: #000;
       }
 
       .param-row,
@@ -225,23 +188,20 @@
       .remove-button {
         background: none;
         border: none;
-        color: #ef4444; /* Rojo */
+        color: #666;
         cursor: pointer;
         font-size: 20px;
         height: 42px;
         width: 42px;
-        border-radius: 4px;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: background-color 0.2s;
       }
 
       .remove-button:hover {
-        background-color: rgba(239, 68, 68, 0.1);
+        color: #d1d1d1;
       }
 
-      /* --- PESTAÑAS DE CONTENIDO (Body, Params, Headers, Auth) --- */
       .tab-auth-header {
         display: flex;
         margin-bottom: 0;
@@ -250,27 +210,26 @@
       .auth-tab-button {
         padding: 10px 15px;
         cursor: pointer;
-        background: #1b192a;
-        border: 1px solid #3f3d56;
-        color: #a6adbb;
-        border-radius: 6px 6px 0 0;
+        background: #000;
+        border: 1px solid #333;
+        color: #666;
+        border-radius: 0;
         margin-right: 5px;
         transition: all 0.2s;
-        font-size: 14px;
-        font-weight: 500;
+        font-size: 13px;
+        font-weight: 600;
         border-bottom: none;
+        text-transform: uppercase;
       }
 
       .auth-tab-button.active {
-        background: #3f3d56;
-        color: #f0f4f8;
-        font-weight: 600;
+        border-top: 1px solid #888;
+        color: #d1d1d1;
       }
 
       .auth-content {
-        border: 1px solid #3f3d56;
+        border: 1px solid #333;
         padding: 20px;
-        border-radius: 0 8px 8px 8px;
         margin-top: 0;
       }
 
@@ -278,23 +237,19 @@
         display: none;
       }
 
-      /* --- RESPUESTA (Response) --- */
       .response-container {
         margin-top: 35px;
-        background-color: #1b192a;
-        border: 1px solid #3f3d56;
-        border-radius: 8px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        background-color: #000;
+        border: 1px solid #333;
       }
 
       .response-header {
         display: flex;
         justify-content: space-between;
         padding: 12px 20px;
-        border-bottom: 1px solid #3f3d56;
-        font-size: 14px;
-        color: #a6adbb;
-        font-weight: 500;
+        border-bottom: 1px solid #333;
+        font-size: 13px;
+        color: #888;
       }
 
       .response-content {
@@ -302,40 +257,28 @@
       }
 
       .response-data {
-        background-color: #110f1a; /* Fondo de consola */
+        background-color: #000;
         padding: 15px;
-        border-radius: 4px;
         white-space: pre-wrap;
         word-wrap: break-word;
         max-height: 450px;
         overflow-y: auto;
         font-size: 13px;
         line-height: 1.4;
+        color: #d1d1d1;
       }
 
-      /* Códigos de estado */
-      .status-2xx {
-        color: #34d399; /* Green */
-        font-weight: bold;
-      }
-      .status-3xx {
-        color: #fbbf24; /* Amber Yellow */
-        font-weight: bold;
-      }
-      .status-4xx,
-      .status-5xx {
-        color: #ef4444; /* Red */
-        font-weight: bold;
-      }
+      .status-2xx { color: #d1d1d1; font-weight: bold; border-bottom: 2px solid #0f0; }
+      .status-3xx { color: #d1d1d1; font-weight: bold; border-bottom: 2px solid #ff0; }
+      .status-4xx, .status-5xx { color: #d1d1d1; font-weight: bold; border-bottom: 2px solid #f00; }
 
-      /* --- LOADING OVERLAY --- */
       .loading-overlay {
         position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.7);
+        background: rgba(0, 0, 0, 0.8);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -348,29 +291,23 @@
       }
 
       .spinner {
-        border: 4px solid rgba(255, 255, 255, 0.2);
-        border-top: 4px solid #8b5cf6; /* Spinner Violeta */
+        border: 2px solid #333;
+        border-top: 2px solid #d1d1d1;
         border-radius: 50%;
-        width: 40px;
-        height: 40px;
+        width: 30px;
+        height: 30px;
         animation: spin 1s linear infinite;
       }
 
       @keyframes spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
       }
-
-      /* --- PESTAÑAS PRINCIPALES (HTTP/SOCKET) --- */
 
       .tab-header {
         display: flex;
         margin-bottom: 20px;
-        border-bottom: 2px solid #3f3d56;
+        border-bottom: 1px solid #333;
       }
 
       .tab-button {
@@ -378,31 +315,24 @@
         cursor: pointer;
         background: transparent;
         border: none;
-        color: #a6adbb;
-        font-size: 16px;
-        border-bottom: 3px solid transparent;
+        color: #666;
+        font-size: 15px;
+        border-bottom: 2px solid transparent;
         transition: all 0.2s;
         font-weight: 600;
+        text-transform: uppercase;
       }
 
-      .tab-button:hover {
-        color: #f0f4f8;
-      }
+      .tab-button:hover { color: #999; }
 
       .tab-button.active {
-        color: #8b5cf6; /* Violeta Activo */
-        border-bottom: 3px solid #8b5cf6;
+        color: #d1d1d1;
+        border-bottom: 2px solid #d1d1d1;
       }
 
-      .tab-content {
-        display: none;
-      }
+      .tab-content { display: none; }
+      .tab-content.active { display: block; }
 
-      .tab-content.active {
-        display: block;
-      }
-
-      /* --- SOCKET.IO --- */
       .socket-controls {
         display: flex;
         gap: 15px;
@@ -416,64 +346,158 @@
 
       .status-indicator {
         padding: 8px 12px;
-        border-radius: 6px;
+        border: 1px solid #333;
         font-weight: bold;
-        color: #110f1a;
-        font-size: 13px;
+        color: #d1d1d1;
+        font-size: 12px;
         text-transform: uppercase;
         flex-shrink: 0;
       }
 
-      .status-indicator.connected {
-        background-color: #34d399;
-      }
-      .status-indicator.connecting {
-        background-color: #fbbf24;
-      }
-      .status-indicator.disconnected {
-        background-color: #ef4444;
-      }
+      .status-indicator.connected { border-color: #0f0; box-shadow: 0 0 5px rgba(0, 255, 0, 0.2); }
+      .status-indicator.connecting { border-color: #ff0; }
+      .status-indicator.disconnected { border-color: #f00; }
 
       .log-container {
-        background-color: #1b192a;
-        border: 1px solid #3f3d56;
+        background-color: #000;
+        border: 1px solid #333;
         padding: 10px;
         height: 350px;
         overflow-y: scroll;
         margin-top: 15px;
-        border-radius: 6px;
         font-size: 12px;
         white-space: pre-wrap;
+        color: #888;
       }
 
       .log-entry {
-        border-bottom: 1px dotted #3f3d56;
+        border-bottom: 1px solid #111;
         padding: 5px 0;
       }
 
-      .log-entry:last-child {
-        border-bottom: none;
-      }
-
-      .log-entry.log-event {
-        color: #8b5cf6; /* Violeta para eventos */
-      }
-
-      .log-entry.log-error {
-        color: #ef4444;
-        font-weight: bold;
-      }
-
-      .log-time {
-        color: #6b7280; /* Gris sutil para timestamp */
-        margin-right: 8px;
-      }
+      .log-entry.log-event { color: #d1d1d1; }
+      .log-entry.log-error { color: #f00; }
+      .log-time { color: #444; margin-right: 8px; }
 
       .socket-payload-group {
         display: grid;
         grid-template-columns: 1fr 180px;
         gap: 20px;
         align-items: end;
+      }
+
+      /* New Socket Layout */
+      .socket-layout {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 20px;
+        margin-top: 10px;
+        align-items: start;
+      }
+
+      .socket-config-col {
+        background: #080808;
+        padding: 20px;
+        border: 1px solid #333;
+        border-radius: 4px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .socket-config-col h2 {
+        font-size: 14px !important;
+        color: #888;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+        border-bottom: 1px solid #222;
+        padding-bottom: 8px;
+        letter-spacing: 1px;
+      }
+
+      .socket-config-col .input-group {
+        margin-bottom: 5px;
+      }
+
+      .socket-config-col label {
+        font-size: 11px;
+        margin-bottom: 4px;
+      }
+
+      .socket-config-col input {
+        padding: 8px 12px;
+        font-size: 13px;
+        height: 38px;
+      }
+
+      .socket-action-group {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      .socket-action-group .status-indicator {
+        text-align: center;
+        width: 100%;
+        margin-top: 5px;
+      }
+
+      .socket-main-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        border: 1px solid #333;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+
+      .socket-tabs-header {
+        display: flex;
+        background: #111;
+        border-bottom: 1px solid #333;
+      }
+
+      .socket-tab-btn {
+        flex: 1;
+        padding: 12px;
+        background: transparent;
+        border: none;
+        color: #666;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        transition: all 0.2s;
+        border-bottom: 2px solid transparent;
+      }
+
+      .socket-tab-btn:hover {
+        color: #999;
+        background: #151515;
+      }
+
+      .socket-tab-btn.active {
+        color: #d1d1d1;
+        border-bottom: 2px solid #d1d1d1;
+        background: #000;
+      }
+
+      .socket-tab-content {
+        display: none;
+        background: #000;
+        padding: 20px;
+        min-height: 500px;
+      }
+
+      .socket-tab-content.active {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .socket-tab-content .log-container {
+        margin-top: 0;
+        border-color: #222;
       }
     </style>
   </head>
@@ -527,15 +551,11 @@
                 Cargar
               </button>
               <button
-                id="http-delete-collection-button"
-                class="action-button"
-                style="
-                  align-self: flex-end;
-                  width: 80px;
-                  background-color: #ef4444;
-                "
-                disabled
-              >
+                  id="http-delete-collection-button"
+                  class="action-button"
+                  style="align-self: flex-end; width: 80px;"
+                  disabled
+                >
                 Eliminar
               </button>
             </div>
@@ -543,14 +563,14 @@
               <button
                 id="http-import-json-button"
                 class="action-button"
-                style="width: 48%; background-color: #10b981"
+                style="width: 48%;"
               >
                 📥 Importar JSON
               </button>
               <button
                 id="http-export-json-button"
                 class="action-button"
-                style="width: 48%; background-color: #3b82f6"
+                style="width: 48%;"
               >
                 📤 Exportar JSON
               </button>
@@ -598,15 +618,11 @@
                 Cargar
               </button>
               <button
-                id="socket-delete-collection-button"
-                class="action-button"
-                style="
-                  align-self: flex-end;
-                  width: 80px;
-                  background-color: #ef4444;
-                "
-                disabled
-              >
+                  id="socket-delete-collection-button"
+                  class="action-button"
+                  style="align-self: flex-end; width: 80px;"
+                  disabled
+                >
                 Eliminar
               </button>
             </div>
@@ -614,14 +630,14 @@
               <button
                 id="socket-import-json-button"
                 class="action-button"
-                style="width: 48%; background-color: #10b981"
+                style="width: 48%;"
               >
                 📥 Importar JSON
               </button>
               <button
                 id="socket-export-json-button"
                 class="action-button"
-                style="width: 48%; background-color: #3b82f6"
+                style="width: 48%;"
               >
                 📤 Exportar JSON
               </button>
@@ -688,7 +704,6 @@
               <button
                 id="repeat-button"
                 class="action-button"
-                style="background-color: #8b5cf6"
               >
                 Repeat Request
               </button>
@@ -812,106 +827,80 @@
           </div>
 
           <div id="socket-tab" class="tab-content">
-            <h2>Socket.IO Connection</h2>
-
-            <div class="socket-controls">
-              <input
-                type="text"
-                id="socket-url-input"
-                placeholder="Socket URL (e.g., http://localhost:3000)"
-              />
-              <button id="socket-connect-button" class="action-button">
-                Connect
-              </button>
-              <button
-                id="socket-disconnect-button"
-                class="action-button"
-                style="display: none"
-              >
-                Disconnect
-              </button>
-              <span id="socket-status" class="status-indicator disconnected"
-                >Disconnected</span
-              >
-            </div>
-
-            <div class="input-group">
-              <label for="socket-token-input">Auth Token (Bearer)</label>
-              <input
-                type="text"
-                id="socket-token-input"
-                placeholder="Optional Auth Token"
-              />
-            </div>
-
-            <div class="input-group">
-              <label for="socket-user-id">User ID (for 'join' room)</label>
-              <input
-                type="text"
-                id="socket-user-id"
-                placeholder="Optional User ID"
-              />
-            </div>
-
-            <hr style="margin: 20px 0; border-color: #334155" />
-
-            <h2>Emit Event</h2>
-
-            <div class="socket-payload-group">
-              <div class="input-group">
-                <label for="socket-event-name">Event Name</label>
-                <input
-                  type="text"
-                  id="socket-event-name"
-                  value="message"
-                  placeholder="e.g., newMessage"
-                />
+            <div class="socket-layout">
+              <!-- Left Column: Config -->
+              <div class="socket-config-col">
+                <h2>Connection</h2>
+                <div class="input-group">
+                  <label for="socket-url-input">URL</label>
+                  <input type="text" id="socket-url-input" placeholder="http://localhost:3000" />
+                </div>
+                <div class="input-group">
+                  <label for="socket-path-input">Path</label>
+                  <input type="text" id="socket-path-input" placeholder="/socket.io" />
+                </div>
+                <div class="input-group">
+                  <label for="socket-token-input">Auth Token (Bearer)</label>
+                  <input type="text" id="socket-token-input" placeholder="Optional Token" />
+                </div>
+                <div class="input-group">
+                  <label for="socket-user-id">User ID (join room)</label>
+                  <input type="text" id="socket-user-id" placeholder="Optional User ID" />
+                </div>
+                
+                <div class="socket-action-group">
+                  <button id="socket-connect-button" class="action-button">Connect</button>
+                  <button id="socket-disconnect-button" class="action-button" style="display: none">Disconnect</button>
+                  <span id="socket-status" class="status-indicator disconnected">Disconnected</span>
+                </div>
               </div>
-              <div class="input-group" style="padding-top: 15px">
-                <button id="socket-emit-button" class="action-button" disabled>
-                  Emit Event
-                </button>
-              </div>
-            </div>
 
-            <div class="input-group">
-              <label for="socket-payload-textarea">Payload (JSON)</label>
-              <textarea id="socket-payload-textarea" rows="8">{}</textarea>
-            </div>
+              <!-- Right Column: Interactive Tabs -->
+              <div class="socket-main-col">
+                <div class="socket-tabs-header">
+                  <button class="socket-tab-btn active" data-socket-tab="emit">Emit Event</button>
+                  <button class="socket-tab-btn" data-socket-tab="listen">Listen Event</button>
+                  <button class="socket-tab-btn" data-socket-tab="logs">Socket Logs</button>
+                </div>
+                
+                <!-- Tab: Emit -->
+                <div class="socket-tab-content active" id="socket-emit-tab">
+                  <div class="input-group">
+                    <label for="socket-event-name">Event Name</label>
+                    <input type="text" id="socket-event-name" value="message" placeholder="e.g., newMessage" />
+                  </div>
+                  <div class="input-group" style="flex-grow: 1; display: flex; flex-direction: column;">
+                    <label for="socket-payload-textarea">Payload (JSON)</label>
+                    <textarea id="socket-payload-textarea" style="flex-grow: 1; min-height: 300px;">{}</textarea>
+                  </div>
+                  <button id="socket-emit-button" class="action-button" disabled style="margin-top: 10px;">
+                    Emit Event
+                  </button>
+                </div>
 
-            <hr style="margin: 20px 0; border-color: #334155" />
+                <!-- Tab: Listen -->
+                <div class="socket-tab-content" id="socket-listen-tab">
+                  <div class="socket-payload-group" style="grid-template-columns: 1fr 120px 120px; gap: 10px; margin-bottom: 15px;">
+                    <div class="input-group" style="margin-bottom: 0;">
+                      <label for="socket-listen-event-name">Event Name Listener</label>
+                      <input type="text" id="socket-listen-event-name" value="message" placeholder="e.g., newMessage" />
+                    </div>
+                    <button id="socket-listen-button" class="action-button" disabled>Escuchar</button>
+                    <button id="clear-listen-log-button" class="action-button" disabled>Limpiar</button>
+                  </div>
+                  <div id="socket-listen-log-container" class="log-container" style="flex-grow: 1; height: auto;"></div>
+                </div>
 
-            <h2>Listen Event</h2>
-            <div class="socket-payload-group" style="grid-template-columns: 1fr 120px 120px; gap: 10px; margin-top: 10px; align-items: end;">
-              <div class="input-group" style="margin-bottom: 0;">
-                <label for="socket-listen-event-name">Event Name Listener</label>
-                <input
-                  type="text"
-                  id="socket-listen-event-name"
-                  value="message"
-                  placeholder="e.g., newMessage"
-                />
-              </div>
-              <div class="input-group" style="margin-bottom: 0;">
-                <button id="socket-listen-button" class="action-button" style="width: 100%;" disabled>
-                  Escuchar
-                </button>
-              </div>
-              <div class="input-group" style="margin-bottom: 0;">
-                <button id="clear-listen-log-button" class="action-button" style="width: 100%; background-color: #ef4444;" disabled>
-                  Limpiar
-                </button>
+                <!-- Tab: Logs -->
+                <div class="socket-tab-content" id="socket-logs-tab">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h2 style="font-size: 14px; color: #888; text-transform: uppercase;">Connection Logs</h2>
+                    <button id="clear-socket-log-button" class="action-button" style="height: 30px; padding: 5px 10px; font-size: 11px;">Limpiar Logs</button>
+                  </div>
+                  <div id="socket-log-container" class="log-container" style="flex-grow: 1; height: auto;"></div>
+                </div>
               </div>
             </div>
-            <div id="socket-listen-log-container" class="log-container" style="height: 200px; margin-top: 15px;"></div>
-
-            <hr style="margin: 20px 0; border-color: #334155" />
-
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <h2>Socket Log</h2>
-              <button id="clear-socket-log-button" class="action-button" style="height: 30px; padding: 5px 10px; font-size: 13px; background-color: #ef4444;">Limpiar Logs</button>
-            </div>
-            <div id="socket-log-container" class="log-container"></div>
           </div>
         </div>
       </div>
@@ -969,6 +958,7 @@
 
       // --- HTML ELEMENTS (SOCKET) ---
       const socketUrlInput = document.getElementById("socket-url-input");
+      const socketPathInput = document.getElementById("socket-path-input");
       const socketTokenInput = document.getElementById("socket-token-input");
       const socketUserIdInput = document.getElementById("socket-user-id");
       const socketConnectButton = document.getElementById(
@@ -1432,6 +1422,7 @@
             userId: socketUserIdInput.value,
             eventName: socketEventNameInput.value,
             payload: socketPayloadTextarea.value,
+            path: socketPathInput.value,
           };
         }
         return {};
@@ -1475,6 +1466,7 @@
           socketUserIdInput.value = collection.userId || "";
           socketEventNameInput.value = collection.eventName || "message";
           socketPayloadTextarea.value = collection.payload || "{}";
+          socketPathInput.value = collection.path || "/socket.io";
 
           // Sincronizar con el estado de la extensión si es necesario para conexión
           saveSocketState();
@@ -1751,6 +1743,7 @@
       // Event Listeners para Socket
       [
         socketUrlInput,
+        socketPathInput,
         socketTokenInput,
         socketUserIdInput,
         socketEventNameInput,
@@ -1800,6 +1793,7 @@
           socketListenButton.disabled = false;
           clearListenLogButton.disabled = false;
           socketUrlInput.disabled = true;
+          socketPathInput.disabled = true;
           socketTokenInput.disabled = true;
           socketUserIdInput.disabled = true;
         } else {
@@ -1809,6 +1803,7 @@
           socketListenButton.disabled = true;
           clearListenLogButton.disabled = true;
           socketUrlInput.disabled = false;
+          socketPathInput.disabled = false;
           socketTokenInput.disabled = false;
           socketUserIdInput.disabled = false;
         }
@@ -1961,6 +1956,7 @@
             socketUserIdInput.value = socketState.userId || "";
             socketEventNameInput.value = socketState.eventName || "message";
             socketPayloadTextarea.value = socketState.payload || "{}";
+            socketPathInput.value = socketState.path || "/socket.io";
 
             updateSocketStatus(message.status.text, message.status.class);
             break;
@@ -2085,6 +2081,26 @@
             }
             break;
         }
+      });
+      // --- SOCKET SUB-TAB LOGIC ---
+      const socketTabButtons = document.querySelectorAll(".socket-tab-btn");
+      const socketTabContents = document.querySelectorAll(".socket-tab-content");
+
+      socketTabButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const target = button.getAttribute("data-socket-tab");
+          
+          socketTabButtons.forEach((btn) => btn.classList.remove("active"));
+          button.classList.add("active");
+
+          socketTabContents.forEach((content) => {
+            if (content.id === `socket-${target}-tab`) {
+              content.classList.add("active");
+            } else {
+              content.classList.remove("active");
+            }
+          });
+        });
       });
     </script>
   </body>

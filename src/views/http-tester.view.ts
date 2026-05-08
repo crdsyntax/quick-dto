@@ -12,6 +12,7 @@ interface SocketTesterState {
   userId: string;
   eventName: string;
   payload: string;
+  path: string;
 }
 
 export class HttpTesterPanel {
@@ -31,8 +32,9 @@ export class HttpTesterPanel {
     url: "http://localhost:3000",
     token: "",
     userId: "",
-    eventName: "message",
+    eventName: "",
     payload: "{\n  \n}",
+    path: "",
   };
 
   private _lastSocketStatus: { text: string; class: string } = {
@@ -196,7 +198,8 @@ export class HttpTesterPanel {
     // Conexión con opciones de autenticación y query
     this.socket = io(state.url, {
       transports: ["websocket", "polling"],
-      auth: state.token ? { token: `Bearer ${state.token}` } : undefined,
+      path: state.path || "/socket.io",
+      auth: state.token ? { token: state.token } : undefined,
       query: state.userId ? { userId: state.userId } : undefined,
     });
 
