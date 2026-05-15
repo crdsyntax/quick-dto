@@ -24,6 +24,7 @@ export class HttpTesterPanel {
   private readonly _generator = HttpTesterGenerator.getInstance();
   private static _context: vscode.ExtensionContext;
   private static readonly COLLECTIONS_STORAGE_KEY = "httpTester.collections";
+  private static readonly LAST_REQUEST_STORAGE_KEY = "httpTester.lastRequest";
 
   private socket?: Socket;
   private socketChannel: vscode.OutputChannel;
@@ -43,6 +44,7 @@ export class HttpTesterPanel {
   };
 
   private _listenedEvents: Set<string> = new Set();
+  private _globalToken: string = "";
 
   // ID único para cada panel
   private readonly _id: string;
@@ -51,6 +53,9 @@ export class HttpTesterPanel {
     this._panel = panel;
     this._extensionUri = extensionUri;
     this._id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+    // Cargar token global inicial
+    this._globalToken = HttpTesterPanel._context?.globalState.get<string>("httpTester.globalToken", "") || "";
 
     // Configurar el panel
     this._panel.title = `API Tester ${HttpTesterPanel.panels.length + 1}`;
@@ -73,6 +78,15 @@ export class HttpTesterPanel {
 
     // Cargar colecciones
     this._loadAndSendCollections();
+    this._sendGlobalToken();
+  }
+
+  private _sendGlobalToken() {
+    this._panel.webview.postMessage({
+      command: "loadGlobalToken",
+      token: this._globalToken,
+      panelId: this._id,
+    });
   }
 
   public loadCollections(collections: HttpCollection[]) {
@@ -80,6 +94,16 @@ export class HttpTesterPanel {
       this._panel.webview.postMessage({
         command: "loadCollections",
         collections: collections,
+      });
+    }
+  }
+
+  public syncCollections(collections: HttpCollection[]) {
+    if (this._panel) {
+      this._panel.webview.postMessage({
+        command: "initializeCollections",
+        collections: collections,
+        panelId: this._id,
       });
     }
   }
@@ -407,6 +431,45 @@ export class HttpTesterPanel {
             await this._handleExportJson(msg.type, msg.collections);
           } else if (msg.command === "saveCollections") {
             await this._saveCollections(msg.collections);
+          } else if (msg.command === "deleteCollection") {
+            const currentCollections = this._loadCollections();
+            const updatedCollections = currentCollections.filter(
+              (c) => !(c.name === msg.name && c.type === msg.type)
+            );
+            await HttpTesterPanel.saveCollections(HttpTesterPanel._context, updatedCollections);
+          } else if (msg.command === "saveLastRequest") {
+            await HttpTesterPanel._context?.globalState.update(
+              HttpTesterPanel.LAST_REQUEST_STORAGE_KEY,
+              msg.request
+            );
+          } else if (msg.command === "importSwagger") {
+            await this._handleImportSwagger(msg.url);
+          } else if (msg.command === "detectSwagger") {
+            const urls = await this._detectSwaggerUrls();
+            if (urls.length === 0) {
+              vscode.window.showWarningMessage(
+                "No se detectaron URLs de Swagger automáticamente. Intenta ingresar una manualmente."
+              );
+              webview.postMessage({
+                command: "stopLoading",
+                panelId: this._id,
+              });
+              return;
+            }
+
+            const selectedUrl = await vscode.window.showQuickPick(urls, {
+              placeHolder: "Selecciona la URL de Swagger detectada",
+              title: "Importar desde Swagger",
+            });
+
+            if (selectedUrl) {
+              await this._handleImportSwagger(selectedUrl);
+            }
+            
+            webview.postMessage({
+              command: "stopLoading",
+              panelId: this._id,
+            });
           } else if (msg.command.startsWith("socket")) {
             this._handleSocketMessage(msg);
           } else if (msg.command === "getPanelId") {
@@ -429,6 +492,63 @@ export class HttpTesterPanel {
     );
   }
 
+  private async _detectSwaggerUrls(): Promise<string[]> {
+    const urls: string[] = [];
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) return [];
+
+    for (const folder of workspaceFolders) {
+      // 1. Try to find .env files for PORT
+      const envFiles = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(folder, "**/.env")
+      );
+      let port = "3000";
+      for (const envFile of envFiles) {
+        try {
+          const content = fs.readFileSync(envFile.fsPath, "utf8");
+          const portMatch = content.match(/^PORT=(\d+)/m);
+          if (portMatch) {
+            port = portMatch[1];
+            break;
+          }
+        } catch (e) {}
+      }
+
+      // 2. Try to find Swagger setup paths
+      const swaggerFiles = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(folder, "**/src/**/*.ts")
+      );
+      let swaggerPath = "api/doc";
+      for (const swaggerFile of swaggerFiles) {
+        try {
+          const content = fs.readFileSync(swaggerFile.fsPath, "utf8");
+          const setupMatch = content.match(
+            /SwaggerModule\.setup\(\s*["']([^"']+)["']/
+          );
+          if (setupMatch) {
+            swaggerPath = setupMatch[1];
+            break;
+          }
+        } catch (e) {}
+      }
+
+      // Add common combinations
+      urls.push(`http://localhost:${port}/${swaggerPath}-json`);
+      urls.push(`http://localhost:${port}/api-json`);
+      urls.push(`http://localhost:${port}/swagger-json`);
+
+      // 3. Search for local Swagger/OpenAPI files
+      const localSwaggerFiles = await vscode.workspace.findFiles(
+        new vscode.RelativePattern(folder, "**/{swagger,openapi,api-docs}*.{json,yaml,yml}")
+      );
+      for (const file of localSwaggerFiles) {
+        urls.push(file.fsPath);
+      }
+    }
+
+    return [...new Set(urls)];
+  }
+
   private async _handleImportJson(type: "http" | "socket") {
     try {
       const fileUri = await vscode.window.showOpenDialog({
@@ -443,7 +563,6 @@ export class HttpTesterPanel {
         return;
       }
 
-      const fs = require("fs");
       const fileContent = fs.readFileSync(fileUri[0].fsPath, "utf8");
 
       let collections: HttpCollection[];
@@ -502,21 +621,31 @@ export class HttpTesterPanel {
     }
   }
 
+  public static async saveCollections(context: vscode.ExtensionContext, collections: HttpCollection[]) {
+    await context.globalState.update(this.COLLECTIONS_STORAGE_KEY, collections);
+
+    // Sync all open panels
+    this.panels.forEach((panel) => {
+      panel.syncCollections(collections);
+    });
+
+    // Refresh Sidebar
+    try {
+      const { HttpTesterSidebarProvider } = require("./http-tester-sidebar.view");
+      if (HttpTesterSidebarProvider.instance) {
+        HttpTesterSidebarProvider.instance.refreshCollections();
+      }
+    } catch (error) {
+      console.error("Error refreshing sidebar:", error);
+    }
+  }
+
   private async _saveCollections(collections: HttpCollection[]) {
     if (!HttpTesterPanel._context) {
       console.error("Extension context not available for saving collections");
       return;
     }
-    await HttpTesterPanel._context.globalState.update(
-      HttpTesterPanel.COLLECTIONS_STORAGE_KEY,
-      collections
-    );
-
-    // Refresh Sidebar
-    const { HttpTesterSidebarProvider } = require("./http-tester-sidebar.view");
-    if (HttpTesterSidebarProvider.instance) {
-      HttpTesterSidebarProvider.instance.refreshCollections();
-    }
+    await HttpTesterPanel.saveCollections(HttpTesterPanel._context, collections);
   }
 
   private _loadCollections(): HttpCollection[] {
@@ -532,13 +661,17 @@ export class HttpTesterPanel {
 
   private _loadAndSendCollections() {
     const collections = this._loadCollections();
-    if (collections.length > 0) {
-      this._panel.webview.postMessage({
-        command: "initializeCollections",
-        collections: collections,
-        panelId: this._id,
-      });
-    }
+    const lastRequest = HttpTesterPanel._context?.globalState.get<any>(
+      HttpTesterPanel.LAST_REQUEST_STORAGE_KEY,
+      null
+    );
+
+    this._panel.webview.postMessage({
+      command: "initializeCollections",
+      collections: collections,
+      lastRequest: lastRequest,
+      panelId: this._id,
+    });
   }
 
   private async _handleExportJson(
@@ -568,7 +701,6 @@ export class HttpTesterPanel {
         return;
       }
 
-      const fs = require("fs");
       const jsonContent = JSON.stringify(filteredCollections, null, 2);
       fs.writeFileSync(fileUri.fsPath, jsonContent, "utf8");
 
@@ -580,6 +712,57 @@ export class HttpTesterPanel {
         `Error al exportar JSON: ${
           error instanceof Error ? error.message : String(error)
         }`
+      );
+    }
+  }
+
+  private async _handleImportSwagger(urlOrPath: string) {
+    try {
+      let openApiJson: any;
+
+      if (urlOrPath.startsWith("http")) {
+        const axios = require("axios");
+        const response = await axios.get(urlOrPath);
+        openApiJson = response.data;
+      } else {
+        const content = fs.readFileSync(urlOrPath, "utf8");
+        if (urlOrPath.endsWith(".yaml") || urlOrPath.endsWith(".yml")) {
+          const yaml = require("js-yaml");
+          openApiJson = yaml.load(content);
+        } else {
+          openApiJson = JSON.parse(content);
+        }
+      }
+
+      const baseUrl = urlOrPath.startsWith("http") 
+        ? new URL(urlOrPath).origin 
+        : "http://localhost:3000";
+
+      const collections = HttpTesterGenerator.generateCollectionsFromOpenApi(
+        openApiJson,
+        baseUrl
+      );
+
+      if (collections.length === 0) {
+        vscode.window.showWarningMessage(
+          "No se pudieron generar colecciones desde el JSON de Swagger proporcionado."
+        );
+        return;
+      }
+
+      this._panel.webview.postMessage({
+        command: "importedCollections",
+        collections: collections,
+        type: "http",
+        panelId: this._id,
+      });
+
+      vscode.window.showInformationMessage(
+        `✅ ${collections.length} peticiones importadas desde Swagger.`
+      );
+    } catch (error: any) {
+      vscode.window.showErrorMessage(
+        `Error al importar Swagger: ${error.message}`
       );
     }
   }

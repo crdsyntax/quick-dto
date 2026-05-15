@@ -133,6 +133,12 @@ export async function generateCollectionsFromControllerCommand(
         baseUrl,
         dtoContents
       );
+    
+    // Extraer nombre del controlador para el grupo
+    const controllerNameMatch = fullCode.match(/class\s+(\w+Controller)/);
+    const groupName = controllerNameMatch ? controllerNameMatch[1] : path.basename(fileUri.fsPath, '.ts');
+
+    allCollections = allCollections.map(c => ({ ...c, group: groupName }));
     let finalCollections: HttpCollection[] = allCollections;
 
     // --- Filtrado si hay selección ---

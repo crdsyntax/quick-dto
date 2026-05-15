@@ -62,8 +62,9 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
 
     this._setWebviewMessageListener(webviewView.webview);
 
-    // Load collections initially
+    // Load collections and global token initially
     this.refreshCollections();
+    this._sendGlobalToken();
   }
 
   public refreshCollections() {
@@ -76,6 +77,16 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
       "httpTester.collections",
       []
     );
+  }
+
+  private _sendGlobalToken() {
+    if (this._view) {
+      const token = this._context.globalState.get<string>("httpTester.globalToken", "");
+      this._view.webview.postMessage({
+        command: "loadGlobalToken",
+        token: token,
+      });
+    }
   }
 
   public loadCollections(collections: HttpCollection[]) {
@@ -294,8 +305,35 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
           } else if (msg.command === "exportJson") {
             // Handle JSON export
             await this._handleExportJson(msg.collections);
+          } else if (msg.command === "updateGlobalToken") {
+            await this._context.globalState.update(
+              "httpTester.globalToken",
+              msg.token
+            );
+            vscode.window.showInformationMessage("Token Global actualizado");
+            // Notificar a todos los paneles abiertos
+            const { HttpTesterPanel } = require("./http-tester.view");
+            HttpTesterPanel.panels.forEach((panel: any) => {
+              panel._panel.webview.postMessage({
+                command: "loadGlobalToken",
+                token: msg.token,
+              });
+            });
+          } else if (msg.command === "clearCollections") {
+            const { HttpTesterPanel } = require("./http-tester.view");
+            await HttpTesterPanel.saveCollections(this._context, []);
+            vscode.window.showInformationMessage("Colecciones limpiadas");
+          } else if (msg.command === "deleteCollection") {
+            const currentCollections = this._loadGlobalCollections();
+            const updatedCollections = currentCollections.filter(
+              (c) => !(c.name === msg.name && c.type === msg.type)
+            );
+            const { HttpTesterPanel } = require("./http-tester.view");
+            await HttpTesterPanel.saveCollections(this._context, updatedCollections);
+            vscode.window.showInformationMessage(`Colección '${msg.name}' eliminada`);
           } else if (msg.command === "ready") {
             this.refreshCollections();
+            this._sendGlobalToken();
           } else if (msg.command.startsWith("socket")) {
             this._handleSocketMessage(msg);
           }
@@ -382,14 +420,9 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
           }
         });
 
-        // Save back to Global State
-        await this._context.globalState.update(
-          "httpTester.collections",
-          currentCollections
-        );
-
-        // Refresh UI
-        this.refreshCollections();
+        // Save back to Global State and Sync
+        const { HttpTesterPanel } = require("./http-tester.view");
+        await HttpTesterPanel.saveCollections(this._context, currentCollections);
 
         vscode.window.showInformationMessage(
           `✅ ${filteredCollections.length} colección(es) importada(s) y guardada(s).`

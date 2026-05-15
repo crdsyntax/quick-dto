@@ -563,16 +563,23 @@
               <button
                 id="http-import-json-button"
                 class="action-button"
-                style="width: 48%;"
+                style="width: 31%; font-size: 10px;"
               >
-                📥 Importar JSON
+                📥 JSON
               </button>
               <button
                 id="http-export-json-button"
                 class="action-button"
-                style="width: 48%;"
+                style="width: 31%; font-size: 10px;"
               >
-                📤 Exportar JSON
+                📤 JSON
+              </button>
+              <button
+                id="http-import-swagger-button"
+                class="action-button"
+                style="width: 31%; font-size: 10px; background-color: #49cc90; color: white; border-color: #49cc90;"
+              >
+                ⚡ Swagger
               </button>
             </div>
             <hr style="margin: 20px 0; border-color: #334155" />
@@ -770,7 +777,10 @@
 
             <div id="auth-content" class="auth-content">
               <div class="tab-auth-header">
-                <button class="auth-tab-button active" data-auth-type="none">
+                <button class="auth-tab-button active" data-auth-type="global">
+                  Global (Inherit)
+                </button>
+                <button class="auth-tab-button" data-auth-type="none">
                   None
                 </button>
                 <button class="auth-tab-button" data-auth-type="bearer">
@@ -781,7 +791,14 @@
                 </button>
               </div>
 
-              <div id="auth-none" class="auth-content active">
+              <div id="auth-global" class="auth-content active">
+                <p>Using global authentication token from sidebar.</p>
+                <div id="global-token-status" style="margin-top: 10px; color: #888; font-style: italic;">
+                  Global Token: <span id="current-global-token">Not set</span>
+                </div>
+              </div>
+
+              <div id="auth-none" class="auth-content">
                 <p>No authentication will be used.</p>
               </div>
 
@@ -1044,7 +1061,7 @@
         row.innerHTML = `
             <input type="text" class="${type}-key" placeholder="${type} Key" value="${sanitizedKey}" />
             <input type="text" class="${type}-value" placeholder="${type} Value" value="${sanitizedValue}" />
-            <button class="remove-button" onclick="this.parentNode.remove(); saveGlobalState();">
+            <button class="remove-button" onclick="this.parentNode.remove(); saveRequestState();">
               &times;
             </button>
           `;
@@ -1140,11 +1157,11 @@
       // Event Listeners para agregar fila (incluyendo llamada a saveGlobalState)
       addParamButton.addEventListener("click", () => {
         addRow(paramsContainer, "param");
-        saveGlobalState();
+        saveRequestState();
       });
       addHeaderButton.addEventListener("click", () => {
         addRow(headersContainer, "header");
-        saveGlobalState();
+        saveRequestState();
       });
 
       addFileButton.addEventListener("click", () => {
@@ -1191,7 +1208,7 @@
             div.classList.remove("active");
           });
         document.getElementById(`auth-${type}`).classList.add("active");
-        saveGlobalState();
+        saveRequestState();
       }
 
       document
@@ -1262,7 +1279,7 @@
         });
 
         // El envío de la petición también debe guardar el estado actual
-        saveGlobalState();
+        saveRequestState();
       }
 
       sendButton.addEventListener("click", sendRequest);
@@ -1459,7 +1476,7 @@
           document.getElementById("basic-password").value =
             collection.basicPassword || "";
 
-          saveGlobalState(); // Guardar el nuevo estado cargado
+          saveRequestState(); // Guardar el nuevo estado cargado
         } else if (collection.type === "socket") {
           socketUrlInput.value = collection.url || "";
           socketTokenInput.value = collection.token || "";
@@ -1548,7 +1565,7 @@
         }
 
         updateCollectionSelect();
-        saveGlobalState(); // Guardar el array de colecciones actualizado
+        saveCollectionsState(); // Guardar el array de colecciones actualizado
         nameInput.value = "";
       }
 
@@ -1571,44 +1588,70 @@
           currentTab === "http" ? httpCollectionSelect : socketCollectionSelect;
         const name = select.value;
 
+        if (!name) {
+          alert("Por favor, selecciona una colección para eliminar.");
+          return;
+        }
+
         if (
           confirm(
             `¿Estás seguro de que deseas eliminar la colección '${name}' (${currentTab.toUpperCase()})?`
           )
         ) {
-          collections = collections.filter(
-            (c) => !(c.name === name && c.type === currentTab)
-          );
-          updateCollectionSelect();
-          saveGlobalState();
-          alert(`Colección '${name}' (${currentTab.toUpperCase()}) eliminada.`);
+          // En lugar de filtrar localmente y enviar todo el array,
+          // enviamos un mensaje específico para que la extensión maneje el borrado y la sincronización.
+          vscode.postMessage({
+            command: "deleteCollection",
+            name: name,
+            type: currentTab
+          });
+          
+          alert(`Solicitud de eliminación para '${name}' enviada.`);
         }
       }
 
       /**
-       * Guarda el estado de la extensión, incluyendo las colecciones y el estado de HTTP actual.
-       * Esta función se llama en cualquier cambio de input relevante para asegurar la persistencia.
+       * Guarda el estado de la petición actual (inputs) para persistencia local.
        */
-      function saveGlobalState() {
+      function saveRequestState() {
         const httpState = getCurrentFormState("http");
 
         // Save to webview state for quick restore
-        vscode.setState({
-          // HTTP State (Guardar el último estado en inputs - Persistencia del endpoint consultado)
+        const webviewState = {
+          ...vscode.getState(),
+          // HTTP State
           url: httpState.url,
           method: httpState.method,
           body: httpState.body,
-          queryParams: httpState.queryParams, // NEW
-          headers: httpState.headers, // NEW
+          queryParams: httpState.queryParams,
+          headers: httpState.headers,
           authType: httpState.authType,
           authToken: httpState.authToken,
           basicUsername: httpState.basicUsername,
           basicPassword: httpState.basicPassword,
-          // Global State
+          collections: collections,
+        };
+        
+        vscode.setState(webviewState);
+
+        // Enviar a la extensión para persistencia global
+        vscode.postMessage({
+          command: "saveLastRequest",
+          request: httpState
+        });
+      }
+
+      /**
+       * Guarda específicamente el array de colecciones en la extensión.
+       */
+      function saveCollectionsState() {
+        // Actualizar el estado del webview primero
+        vscode.setState({
+          ...vscode.getState(),
           collections: collections,
         });
 
-        // Send collections to backend for persistent storage
+        // Enviar a la extensión
         vscode.postMessage({
           command: "saveCollections",
           collections: collections,
@@ -1665,7 +1708,7 @@
         document.getElementById("basic-username"),
         document.getElementById("basic-password"),
       ].forEach((element) => {
-        element.addEventListener("input", saveGlobalState);
+        element.addEventListener("input", saveRequestState);
       });
 
       // --- Event Listeners for Collections ---
@@ -1724,6 +1767,22 @@
           collections: collections,
         });
       }
+
+      const httpImportSwaggerButton = document.getElementById(
+        "http-import-swagger-button"
+      );
+
+      function handleImportSwagger() {
+        // Enviar comando para detectar URLs en el workspace
+        vscode.postMessage({
+          command: "detectSwagger"
+        });
+        
+        // Mostrar un mensaje de carga ligero
+        loadingDiv.classList.add("active");
+      }
+
+      httpImportSwaggerButton.addEventListener("click", handleImportSwagger);
 
       httpImportJsonButton.addEventListener("click", handleImportJson);
       socketImportJsonButton.addEventListener("click", handleImportJson);
@@ -1912,6 +1971,10 @@
             responseData.innerHTML += summaryHtml;
             break;
 
+          case "stopLoading":
+            stopLoading();
+            break;
+
           case "socketLog": // Logs del socket
             addSocketLog(message.message, message.type);
             break;
@@ -1923,19 +1986,21 @@
             break;
           case "loadCollections":
             if (message.collections && Array.isArray(message.collections)) {
-              // 1. Filtrar las colecciones HTTP existentes (para no duplicar)
+              // 1. Filtrar las colecciones recibidas para solo quedarnos con las HTTP
+              // (ya que este comando se usa principalmente para colecciones generadas)
+              const newHttpCollections = message.collections.filter(c => c.type === "http");
+
+              // 2. Filtrar las colecciones actuales para quitar las HTTP existentes
               collections = collections.filter((c) => c.type === "socket");
 
-              // 2. Añadir las nuevas colecciones generadas
-              collections.push(...message.collections);
+              // 3. Añadir las nuevas colecciones HTTP
+              collections.push(...newHttpCollections);
 
-              // 3. Refrescar la lista desplegable del sidebar
+              // 4. Refrescar la lista desplegable del sidebar
               updateCollectionSelect();
 
-              // 4. Seleccionar la primera colección generada y cargarla en el formulario
-              const firstHttpCollection = message.collections.find(
-                (c) => c.type === "http"
-              );
+              // 5. Seleccionar la primera colección generada y cargarla en el formulario
+              const firstHttpCollection = newHttpCollections[0];
               if (firstHttpCollection) {
                 httpCollectionSelect.value = firstHttpCollection.name;
                 // Necesario para habilitar/deshabilitar los botones de Cargar/Eliminar
@@ -1943,8 +2008,8 @@
                 handleLoadCollection(); // Cargar la primera colección para que el usuario la vea
               }
 
-              // 5. Persistir el estado (incluyendo las nuevas colecciones)
-              saveGlobalState();
+              // 6. Persistir el estado (incluyendo las nuevas colecciones)
+              saveCollectionsState();
             }
             break;
           case "socketInitialState": // Cargar estado al abrir pestaña
@@ -1980,7 +2045,7 @@
               updateCollectionSelect();
 
               // Save the updated state
-              saveGlobalState();
+              saveCollectionsState();
 
               alert(
                 `✅ ${message.collections.length} colección(es) importada(s) exitosamente.`
@@ -1989,29 +2054,34 @@
             break;
           case "initializeCollections": // Load persisted collections from backend
             if (message.collections && Array.isArray(message.collections)) {
-              // Merge with any collections from webview state
-              const webviewCollections = collections || [];
-
-              // Create a map to avoid duplicates (prefer backend collections)
-              const collectionMap = new Map();
-
-              // Add webview collections first
-              webviewCollections.forEach((col) => {
-                const key = `${col.type}:${col.name}`;
-                collectionMap.set(key, col);
-              });
-
-              // Override with backend collections (these are the source of truth)
-              message.collections.forEach((col) => {
-                const key = `${col.type}:${col.name}`;
-                collectionMap.set(key, col);
-              });
-
-              // Convert map back to array
-              collections = Array.from(collectionMap.values());
-
-              // Update the UI
+              collections = message.collections;
               updateCollectionSelect();
+              
+              // Si se proporciona el último estado de la petición, cargarlo
+              if (message.lastRequest) {
+                const req = message.lastRequest;
+                urlInput.value = req.url || "";
+                methodSelect.value = req.method || "GET";
+                bodyTextarea.value = req.body || "";
+                
+                loadKeyValuesToContainer(paramsContainer, req.queryParams, "param");
+                loadKeyValuesToContainer(headersContainer, req.headers, "header");
+                
+                if (req.authType) {
+                  switchAuthTab(req.authType);
+                  document.getElementById("bearer-token").value = req.authToken || "";
+                  document.getElementById("basic-username").value = req.basicUsername || "";
+                  document.getElementById("basic-password").value = req.basicPassword || "";
+                }
+              }
+
+              // No llamar a saveRequestState aquí para evitar bucles, 
+              // solo actualizar el estado del webview localmente
+              vscode.setState({
+                ...vscode.getState(),
+                collections: collections,
+                ...(message.lastRequest || {})
+              });
             }
             break;
           case "loadRequest": // Load request from sidebar

@@ -25,6 +25,7 @@ export interface HttpResponse {
 }
 export interface HttpCollection {
   name: string;
+  group?: string;
   type: "http" | "socket";
   url: string;
   method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS";
@@ -228,6 +229,151 @@ export class HttpTesterGenerator {
     }
 
     return collections;
+  }
+
+  public static generateCollectionsFromOpenApi(
+    openApiJson: any,
+    baseUrl: string
+  ): HttpCollection[] {
+    const collections: HttpCollection[] = [];
+    const paths = openApiJson.paths || {};
+    const components = openApiJson.components || {};
+    const schemas = components.schemas || {};
+
+    for (const [path, methods] of Object.entries(paths)) {
+      for (const [method, operation] of Object.entries(methods as any)) {
+        const op = operation as any;
+        const httpMethod = method.toUpperCase() as HttpCollection["method"];
+        
+        // Resolve path parameters with examples
+        let fullPath = path;
+        const parameters = op.parameters || [];
+        const queryParams: { key: string; value: string }[] = [];
+        
+        parameters.forEach((param: any) => {
+          if (param.in === "path") {
+            const example = param.example || (param.schema && param.schema.example) || `example-${param.name}`;
+            fullPath = fullPath.replace(`{${param.name}}`, example);
+          } else if (param.in === "query") {
+            queryParams.push({
+              key: param.name,
+              value: String(param.example || (param.schema && param.schema.example) || "")
+            });
+          }
+        });
+
+        // Resolve Body
+        let bodyContent = "";
+        if (op.requestBody) {
+          const content = op.requestBody.content || {};
+          const jsonContent = content["application/json"];
+          if (jsonContent) {
+            // Priority: 1. Single example, 2. Map of examples, 3. Generate from schema
+            if (jsonContent.example) {
+              bodyContent = JSON.stringify(jsonContent.example, null, 2);
+            } else if (jsonContent.examples) {
+              // Take the first example from the map
+              const firstExampleKey = Object.keys(jsonContent.examples)[0];
+              const firstExample = jsonContent.examples[firstExampleKey];
+              const exampleValue = firstExample.value !== undefined ? firstExample.value : firstExample;
+              bodyContent = JSON.stringify(exampleValue, null, 2);
+            } else if (jsonContent.schema) {
+              const example = this.generateExampleFromSchema(jsonContent.schema, schemas);
+              bodyContent = JSON.stringify(example, null, 2);
+            }
+          }
+        }
+
+        const collection: HttpCollection = {
+          name: `${op.tags?.[0] || "Default"}: ${op.summary || op.operationId || path}`,
+          type: "http",
+          url: `${baseUrl}${fullPath}`.replace(/\/+/g, "/").replace(":/", "://"),
+          method: httpMethod,
+          body: bodyContent,
+          queryParams: queryParams,
+          headers: [
+            { key: "Content-Type", value: "application/json" },
+            { key: "Accept", value: "application/json" },
+          ],
+          authType: "bearer",
+          authToken: "{{YOUR_AUTH_TOKEN}}",
+          basicUsername: "",
+          basicPassword: "",
+        };
+
+        collections.push(collection);
+      }
+    }
+
+    return collections;
+  }
+
+  private static generateExampleFromSchema(schema: any, schemas: any): any {
+    if (!schema) return null;
+
+    if (schema.$ref) {
+      const refName = schema.$ref.split("/").pop();
+      const refSchema = schemas[refName];
+      if (refSchema) {
+        return this.generateExampleFromSchema(refSchema, schemas);
+      }
+      return {};
+    }
+
+    if (schema.example !== undefined) {
+      return schema.example;
+    }
+
+    if (schema.allOf) {
+      let combinedExample: any = {};
+      schema.allOf.forEach((subSchema: any) => {
+        const subExample = this.generateExampleFromSchema(subSchema, schemas);
+        if (typeof subExample === "object" && subExample !== null) {
+          combinedExample = { ...combinedExample, ...subExample };
+        }
+      });
+      return combinedExample;
+    }
+
+    if (schema.oneOf || schema.anyOf) {
+      // Just take the first one
+      const subSchema = (schema.oneOf || schema.anyOf)[0];
+      return this.generateExampleFromSchema(subSchema, schemas);
+    }
+
+    if (schema.type === "object" || schema.properties) {
+      const example: any = {};
+      const properties = schema.properties || {};
+      for (const [propName, propSchema] of Object.entries(properties)) {
+        example[propName] = this.generateExampleFromSchema(propSchema, schemas);
+      }
+      return example;
+    }
+
+    if (schema.type === "array") {
+      const itemSchema = schema.items || {};
+      return [this.generateExampleFromSchema(itemSchema, schemas)];
+    }
+
+    // Default values by type
+    switch (schema.type) {
+      case "string":
+        if (schema.format === "date-time") return new Date().toISOString();
+        if (schema.format === "date") return new Date().toISOString().split('T')[0];
+        if (schema.format === "email") return "user@example.com";
+        if (schema.format === "uuid") return "123e4567-e89b-12d3-a456-426614174000";
+        if (schema.enum && schema.enum.length > 0) return schema.enum[0];
+        return "string";
+      case "number":
+      case "integer":
+        return 0;
+      case "boolean":
+        return true;
+      default:
+        // Try to infer type if missing but enum is present
+        if (schema.enum && schema.enum.length > 0) return schema.enum[0];
+        return null;
+    }
   }
 
   public static getInstance(): HttpTesterGenerator {

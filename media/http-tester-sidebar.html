@@ -67,14 +67,44 @@
         margin-bottom: 8px;
       }
 
+      .group-container {
+        margin-bottom: 12px;
+      }
+
+      .group-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--vscode-foreground);
+        padding: 4px 8px;
+        background-color: var(--vscode-list-hoverBackground);
+        border-radius: 2px;
+        margin-bottom: 4px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .group-title::after {
+        content: '▼';
+        font-size: 8px;
+      }
+
+      .group-title.collapsed::after {
+        content: '▶';
+      }
+
+      .group-content.collapsed {
+        display: none;
+      }
+
       .collection-list {
         list-style: none;
       }
 
       .collection-item {
         padding: 6px 8px;
-        margin-bottom: 4px;
-        background-color: var(--vscode-list-inactiveSelectionBackground);
+        margin-bottom: 2px;
         border-radius: 2px;
         cursor: pointer;
         font-size: 13px;
@@ -85,6 +115,10 @@
 
       .collection-item:hover {
         background-color: var(--vscode-list-hoverBackground);
+      }
+
+      .collection-item:hover .delete-item-btn {
+        display: flex;
       }
 
       .collection-name {
@@ -100,6 +134,24 @@
         border-radius: 2px;
         margin-left: 8px;
         font-weight: 600;
+        min-width: 50px;
+        text-align: center;
+      }
+
+      .delete-item-btn {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        margin-left: 4px;
+        color: var(--vscode-descriptionForeground);
+        border-radius: 2px;
+      }
+
+      .delete-item-btn:hover {
+        background-color: var(--vscode-toolbar-hoverBackground);
+        color: var(--vscode-errorForeground);
       }
 
       .method-GET {
@@ -156,20 +208,34 @@
       <button class="button secondary" id="export-json-button">
         📤 Exportar coleccion JSON
       </button>
+      <button class="button" id="clear-collections-button" style="background-color: var(--vscode-errorForeground); color: white;">
+        🗑️ Limpiar Colecciones
+      </button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Global Auth (Bearer)</div>
+      <div style="margin-bottom: 8px; display: flex; gap: 4px;">
+        <input type="password" id="global-token" placeholder="Token Global" 
+               style="flex: 1; padding: 6px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 2px; font-size: 12px;">
+        <button class="button primary" id="save-global-token" style="width: auto; margin-bottom: 0; padding: 4px 8px;">
+          💾
+        </button>
+      </div>
     </div>
 
     <div class="section">
       <div class="section-title">Colecciones HTTP</div>
-      <ul class="collection-list" id="http-collections">
+      <div id="http-collections-container">
         <li class="empty-state">No hay colecciones guardadas</li>
-      </ul>
+      </div>
     </div>
 
     <div class="section">
       <div class="section-title">Colecciones Socket</div>
-      <ul class="collection-list" id="socket-collections">
+      <div id="socket-collections-container">
         <li class="empty-state">No hay colecciones guardadas</li>
-      </ul>
+      </div>
     </div>
 
     <script>
@@ -178,11 +244,32 @@
       const openEditorButton = document.getElementById("open-editor-button");
       const importJsonButton = document.getElementById("import-json-button");
       const exportJsonButton = document.getElementById("export-json-button");
-      const httpCollectionsList = document.getElementById("http-collections");
-      const socketCollectionsList = document.getElementById("socket-collections");
+      const clearCollectionsButton = document.getElementById("clear-collections-button");
+      const httpCollectionsContainer = document.getElementById("http-collections-container");
+      const socketCollectionsContainer = document.getElementById("socket-collections-container");
+      const globalTokenInput = document.getElementById("global-token");
+      const saveGlobalTokenButton = document.getElementById("save-global-token");
 
       let collections = [];
       let currentTab = "http";
+      let collapsedGroups = new Set();
+
+      // Clear Collections
+      clearCollectionsButton.addEventListener("click", () => {
+        if (confirm("¿Estás seguro de que deseas eliminar todas las colecciones?")) {
+          vscode.postMessage({
+            command: "clearCollections"
+          });
+        }
+      });
+
+      // Save Global Token
+      saveGlobalTokenButton.addEventListener("click", () => {
+        vscode.postMessage({
+          command: "updateGlobalToken",
+          token: globalTokenInput.value
+        });
+      });
 
       // Open editor button
       openEditorButton.addEventListener("click", () => {
@@ -218,27 +305,10 @@
         const socketCollections = collections.filter(c => c.type === "socket");
 
         // Render HTTP collections
-        if (httpCollections.length === 0) {
-          httpCollectionsList.innerHTML = '<li class="empty-state">No hay colecciones guardadas</li>';
-        } else {
-          httpCollectionsList.innerHTML = httpCollections.map(col => `
-            <li class="collection-item" data-name="${col.name}" data-type="http">
-              <span class="collection-name">${col.name}</span>
-              <span class="collection-method method-${col.method}">${col.method}</span>
-            </li>
-          `).join('');
-        }
+        renderGroupedCollections(httpCollections, httpCollectionsContainer, "http");
 
         // Render Socket collections
-        if (socketCollections.length === 0) {
-          socketCollectionsList.innerHTML = '<li class="empty-state">No hay colecciones guardadas</li>';
-        } else {
-          socketCollectionsList.innerHTML = socketCollections.map(col => `
-            <li class="collection-item" data-name="${col.name}" data-type="socket">
-              <span class="collection-name">${col.name}</span>
-            </li>
-          `).join('');
-        }
+        renderGroupedCollections(socketCollections, socketCollectionsContainer, "socket");
 
         // Add click listeners
         document.querySelectorAll('.collection-item').forEach(item => {
@@ -255,6 +325,82 @@
             }
           });
         });
+
+        // Add group toggle listeners
+        document.querySelectorAll('.group-title').forEach(title => {
+          title.addEventListener('click', () => {
+            const groupName = title.getAttribute('data-group');
+            const content = title.nextElementSibling;
+            
+            if (collapsedGroups.has(groupName)) {
+              collapsedGroups.delete(groupName);
+              title.classList.remove('collapsed');
+              content.classList.remove('collapsed');
+            } else {
+              collapsedGroups.add(groupName);
+              title.classList.add('collapsed');
+              content.classList.add('collapsed');
+            }
+          });
+        });
+      }
+
+      function renderGroupedCollections(cols, container, type) {
+        if (cols.length === 0) {
+          container.innerHTML = '<li class="empty-state">No hay colecciones guardadas</li>';
+          return;
+        }
+
+        // Group by group property
+        const groups = {};
+        cols.forEach(col => {
+          const groupName = col.group || "Otros";
+          if (!groups[groupName]) {
+            groups[groupName] = [];
+          }
+          groups[groupName].push(col);
+        });
+
+        let html = '';
+        for (const [groupName, groupCols] of Object.entries(groups)) {
+          const isCollapsed = collapsedGroups.has(groupName);
+          html += `
+            <div class="group-container">
+              <div class="group-title ${isCollapsed ? 'collapsed' : ''}" data-group="${groupName}">
+                ${groupName}
+              </div>
+              <div class="group-content ${isCollapsed ? 'collapsed' : ''}">
+                <ul class="collection-list">
+                  ${groupCols.map(col => `
+                    <li class="collection-item" data-name="${col.name}" data-type="${type}">
+                      <span class="collection-name">${col.name}</span>
+                      ${type === 'http' ? `<span class="collection-method method-${col.method}">${col.method}</span>` : ''}
+                      <span class="delete-item-btn" title="Eliminar" data-name="${col.name}" data-type="${type}">🗑️</span>
+                    </li>
+                  `).join('')}
+                </ul>
+              </div>
+            </div>
+          `;
+        }
+        container.innerHTML = html;
+
+        // Add delete button listeners
+        container.querySelectorAll('.delete-item-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Evitar que se abra en el editor
+            const name = btn.getAttribute('data-name');
+            const type = btn.getAttribute('data-type');
+            
+            if (confirm(`¿Estás seguro de que deseas eliminar la colección '${name}'?`)) {
+              vscode.postMessage({
+                command: "deleteCollection",
+                name: name,
+                type: type
+              });
+            }
+          });
+        });
       }
 
       // Handle messages from extension
@@ -266,6 +412,11 @@
             if (message.collections && Array.isArray(message.collections)) {
               collections = message.collections;
               renderCollections();
+            }
+            break;
+          case "loadGlobalToken":
+            if (message.token !== undefined) {
+              globalTokenInput.value = message.token;
             }
             break;
           case "importedCollections":
