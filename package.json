@@ -485,8 +485,10 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile:webview && npm run compile:extension -- --production",
-    "postinstall": "cd media/http-tester-react && npm install",
-    "compile:webview": "cd media/http-tester-react && npm run build",
+    "postinstall": "cd media/http-tester-react && npm install && cd ../erd-visualizer-react && npm install",
+    "compile:webview": "npm run compile:http-tester && npm run compile:erd-visualizer",
+    "compile:http-tester": "cd media/http-tester-react && npm run build",
+    "compile:erd-visualizer": "cd media/erd-visualizer-react && npm run build",
     "compile:extension": "node esbuild.js",
     "compile": "npm run compile:webview && npm run compile:extension",
     "watch": "node esbuild.js --watch",

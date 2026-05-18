@@ -278,6 +278,7 @@ export class HttpTesterPanel {
       this.socket = undefined;
       this._updateSocketStatus("Disconnected", "disconnected");
       this._postSocketLog("Disconnected by user", "info");
+      this._listenedEvents.clear();
     }
   }
 

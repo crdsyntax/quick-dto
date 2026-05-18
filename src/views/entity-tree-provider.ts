@@ -88,10 +88,31 @@ export class EntityTreeDataProvider implements vscode.TreeDataProvider<
     const srcPath = path.join(this._workspaceRoot, "src");
 
     if (!element) {
-      return this.getModuleFolders(srcPath);
+      const folders = await this.getModuleFolders(srcPath);
+      
+      // Check for Prisma schema
+      const prismaPath = path.join(this._workspaceRoot, "prisma", "schema.prisma");
+      const rootPrismaPath = path.join(this._workspaceRoot, "schema.prisma");
+      const finalPrismaPath = fs.existsSync(prismaPath) ? prismaPath : (fs.existsSync(rootPrismaPath) ? rootPrismaPath : null);
+
+      if (finalPrismaPath) {
+        const prismaFolder = new EntityFolderItem(
+          "Prisma Models",
+          finalPrismaPath,
+          vscode.TreeItemCollapsibleState.Collapsed,
+        );
+        prismaFolder.iconPath = new vscode.ThemeIcon("database");
+        prismaFolder.contextValue = "prismaFolder";
+        return [prismaFolder, ...folders];
+      }
+
+      return folders;
     }
 
     if (element instanceof EntityFolderItem) {
+      if (element.contextValue === "prismaFolder") {
+        return this.getPrismaModels(element.folderPath);
+      }
       return this.getEntitiesInFolder(element.folderPath);
     }
 
@@ -100,6 +121,27 @@ export class EntityTreeDataProvider implements vscode.TreeDataProvider<
     }
 
     return [];
+  }
+
+  private async getPrismaModels(schemaPath: string): Promise<EntityItem[]> {
+    try {
+      const content = fs.readFileSync(schemaPath, "utf8");
+      const modelMatches = content.match(/model\s+(\w+)/g) || [];
+      
+      const items = modelMatches.map(match => {
+        const name = match.split(/\s+/)[1];
+        return new EntityItem(
+          name,
+          schemaPath,
+          vscode.TreeItemCollapsibleState.None
+        );
+      });
+
+      if (!this.filterQuery) return items;
+      return items.filter(i => i.label.toLowerCase().includes(this.filterQuery));
+    } catch (err) {
+      return [];
+    }
   }
 
   private async getModuleFolders(srcPath: string): Promise<EntityFolderItem[]> {

@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --vscode-editor-background: #1e1e1e;
+  --vscode-editor-foreground: #cccccc;
+  --vscode-panel-border: #444444;
+  --vscode-focusBorder: #007fd4;
+  --vscode-button-background: #0e639c;
+  --vscode-button-foreground: #ffffff;
+  --vscode-button-hoverBackground: #1177bb;
+  --vscode-input-background: #3c3c3c;
+  --vscode-input-foreground: #cccccc;
+  --vscode-input-border: #3c3c3c;
+  --vscode-titleBar-activeBackground: #333333;
+  --vscode-descriptionForeground: #8b8b8b;
+  --vscode-progressBar-background: #0e639c;
+  --vscode-terminal-ansiYellow: #dcdcaa;
+  --vscode-terminal-ansiCyan: #4ec9b0;
+  --vscode-terminal-ansiBlue: #569cd6;
+  --vscode-errorForeground: #f48771;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}

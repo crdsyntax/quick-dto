@@ -1,117 +1,64 @@
-# NestJS tools Generator (Nest Helper Files)
+# NestJS & Database Tools Generator
 
-Generador de archivos para proyectos NestJS: DTOs con Swagger, Repositories, Services, Controllers y CRUD completo a partir de entidades TypeORM. Incluye una herramienta de autocompletado que intenta inferir el tipo de retorno de métodos async y un generador que crea endpoints de controller a partir de funciones seleccionadas.
+Herramienta integral para desarrolladores de NestJS y backend. Genera DTOs con Swagger, Repositories, Services, Controllers y CRUD completo a partir de entidades TypeORM o modelos de Prisma. Incluye un potente **Visualizador de Diagramas ER** interactivo basado en React y autocompletado inteligente.
 
-## Qué hace
+## Características Principales
 
-- Genera `create`/`update` DTOs (con `@ApiProperty`) para una entidad.
-- Genera archivos de Repository, Service y Controller a partir de entidades y servicios.
-- Generador de Controller por función: crea endpoints en controllers existentes o genera el controller en la raíz del módulo cuando no existe (busca el `*.module.ts` más cercano).
-- Autocompletado inteligente (`Complete Return Type`) que infiere y añade `: Promise<T>` en funciones `async` basándose en el cuerpo de la función.
-- Acciones disponibles desde el menú contextual del explorador (right-click) y atajos de teclado para funciones de editor.
+### 📊 Visualizador de Diagramas ER (ERD) - *¡NUEVO!*
+Visualiza la arquitectura de tu base de datos de forma interactiva y moderna.
+- **Soporte Multi-ORM**: Compatible con entidades **TypeORM** (`.entity.ts`) y modelos de **Prisma** (`schema.prisma`).
+- **Interfaz Interactiva**:
+    - **Redimensionamiento**: Ajusta el tamaño de las entidades para ver campos largos o compactar la vista.
+    - **Drag & Drop**: Organiza tus tablas libremente con persistencia de posición y tamaño.
+    - **Zoom y Pan**: Navega fácilmente por diagramas complejos.
+    - **Editor de Relaciones**: Doble clic en las etiquetas de relación para personalizarlas.
+    - **Navegación Rápida**: Haz clic en campos de relación (🔗) para centrar la entidad relacionada.
+- **Exportación**:
+    - Genera diagramas en formato **SVG**.
+    - Copia el código **Mermaid** directamente al portapapeles para documentación.
+- **Barra Lateral**: Nueva vista de "Entities" que organiza tus entidades por carpetas y modelos de Prisma para un acceso rápido.
 
-## Instalación (local / desarrollo)
+### 🏗️ Generador de Archivos NestJS
+- **Full CRUD**: Genera DTOs, Repository, Service y Controller en un solo clic.
+- **DTOs Inteligentes**: Crea DTOs de `create` y `update` con decoradores de `@ApiProperty` (Swagger).
+- **Controller por función**: Crea endpoints en controllers existentes a partir de funciones seleccionadas en tus servicios.
 
-1. Clona el repositorio y entra en la carpeta del proyecto:
+### 🧠 Inteligencia en el Editor
+- **Autocompletado de Retorno**: Infiere y añade automáticamente `: Promise<T>` en funciones `async` analizando el cuerpo del método (`Ctrl+Shift+T`).
+- **Migración de ORM**: Herramientas para ayudar en la conversión entre TypeORM y Mongoose.
 
+## Comandos Destacados
+
+- `nest-tools.viewEntityErd` — Abre el visualizador interactivo para la entidad/modelo seleccionado.
+- `nest-tools.generateErd` — Genera una imagen estática (PNG) del diagrama usando Mermaid CLI.
+- `nest-dto-generator.generateCrud` — Genera todo el boilerplate necesario para un recurso.
+- `nest-tools.completeReturnType` — Completa el tipo de retorno de una función async (`Ctrl+Shift+T`).
+
+## Instalación y Desarrollo
+
+### Requisitos
+- VS Code 1.80.0 o superior.
+
+### Instalación desde código
+1. Clona el repo: `git clone https://github.com/crdsyntax/quick-dto.git`
+2. Instala dependencias: `npm install`
+3. Compila el proyecto (incluyendo los componentes de React):
 ```bash
-git clone https://github.com/crdsyntax/quick-dto.git
-cd quick-dto
-```
-
-2. Instala dependencias y compila:
-
-```bash
-npm install
 npm run compile
 ```
+4. F5 para iniciar la depuración.
 
-3. Ejecuta en modo desarrollo (F5) desde VS Code para probar en una ventana de Extension Host.
+## Estructura del Proyecto
+- `src/`: Lógica principal de la extensión VS Code.
+- `media/erd-visualizer-react/`: Aplicación React moderna para el visualizador interactivo.
+- `src/generators/parser/`: Parsers especializados para TypeORM y Prisma.
 
-## Empaquetado e instalación (.vsix)
+## Troubleshooting — Solución de problemas
 
-1. Asegúrate de compilar antes de empaquetar:
-
-```bash
-npm run compile
-npx vsce package
-```
-
-2. Instala el `.vsix` en VS Code (Extensions → ••• → Install from VSIX...).
-
-## Comandos disponibles
-
-- nest-dto-generator.generateDto — Genera `create-<entity>` y `update-<entity>` DTOs.
-- nest-dto-generator.generateRepository — Genera repository desde una entidad.
-- nest-dto-generator.generateService — Genera service desde una entidad.
-- nest-dto-generator.generateController — Genera controller a partir de un service o entidad.
-- nest-dto-generator.generateCrud — Ejecuta genérico completo (DTO + Repo + Service + Controller).
-- nest-tools.completeReturnType — Infiera y añade `: Promise<T>` en una función `async` (editor).
-- nest-tools.triggerReturnType — Dispara la acción `completeReturnType` programáticamente.
-- nest-tools.controllerByFunction — Genera endpoints en controller a partir de código seleccionado.
-
-Los comandos aparecen en el Command Palette y en menús contextuales según el tipo de archivo.
-
-## Uso típico
-
-- Generar DTOs: click derecho sobre `user.entity.ts` → "Generate DTOs".
-- Generar Controller: click derecho sobre `user.service.ts` (o `user.entity.ts`) → "Generate Controller from Service".
-- Autocompletar tipo de retorno: coloca el cursor en la línea de la firma `async` y presiona `Ctrl+Shift+T`.
-
-## Estructura y convenciones
-
-- Los archivos generados usan nombres de fichero con primera letra en minúscula (camelCase) para `*.service.ts`, `*.controller.ts` y carpetas `dto/<camelEntity>/...`.
-- El generador de controller ahora crea el archivo bajo la raíz del módulo (directorio que contiene `*.module.ts`) cuando existe; si no, crea el controller en la carpeta del service.
-
-## Troubleshooting — problemas comunes
-
-1. "La extensión funciona en Debug pero no se activa instalada":
-   - Verifica `engines.vscode` en `package.json`. Si tu versión de VS Code es anterior a la requerida, VS Code puede desactivar la extensión.
-   - Comprueba que el paquete `.vsix` incluya `out/extension.js` y los archivos compilados (`out/commands/*`, `out/autocomplete/*`).
-   - Revisa los logs del Extension Host: `Help -> Toggle Developer Tools` (Console) y `Developer: Show Running Extensions`.
-
-2. Error "Cannot find module 'typescript'" en producción:
-   - `completeReturnType` usa la API de `typescript` en tiempo de ejecución. Asegúrate de que `typescript` esté disponible al instalar la extensión (incluido en `dependencies` o usa bundling).
-   - Alternativa: la extensión incluye una verificación en runtime y mostrará un mensaje amigable si `typescript` no está disponible (asegúrate de compilar después de cambios).
-
-3. Error en generación de controller: "Cannot read properties of null (reading 'createSourceFile')":
-   - Ocurre cuando el editor o documento activo no están disponibles. Asegúrate de invocar el comando desde el editor con el archivo abierto o desde el explorador sobre un archivo válido.
-   - El generador ahora valida la presencia de `typescript` y muestra mensajes claros si falta.
-
-4. Nombres de archivos con mayúsculas en la primera letra:
-   - Los generadores han sido corregidos para generar nombres de archivo en camelCase (minúscula inicial). Si ya creaste ficheros con PascalCase, renómbralos manualmente y ajusta imports.
-
-## Desarrollo y contribución
-
-- Ejecuta `npm run watch` para compilar automáticamente mientras desarrollas.
-- Añade tests para generators y parsers en `src/test` si agregas funcionalidad compleja.
-- Si cambias la forma de empaquetar (webpack/esbuild), preferible usar bundling para incluir `typescript` y reducir dependencias en tiempo de instalación.
-
-## Buenas prácticas
-
-- Prueba los comandos en una copia del proyecto o en un branch, ya que los generadores crean/reescriben archivos.
-- Revisa los imports y adapta los paths si tu proyecto utiliza convenciones diferentes (monorepos, paths custom en tsconfig).
-
-## Ejemplos rápidos
-
-Generar controller desde un service abierto:
-
-1. Abre `src/users/services/user.service.ts`.
-2. Ejecuta `Command Palette` → "Generate Controller from Service".
-3. Se generará `src/users/controllers/user.controller.ts` (o en la raíz del módulo si existe `users.module.ts`).
-
-Autocompletar tipo de retorno:
-
-1. Coloca el cursor en la firma `async` de un método en un service.
-2. Presiona `Ctrl+Shift+T`.
-3. Si `typescript` está disponible, la extensión reemplazará la firma por `: Promise<T>` inferido.
+- **El ERD no muestra mi esquema de Prisma**: Asegúrate de tener un archivo `schema.prisma` en la raíz del proyecto o dentro de una carpeta `prisma/`.
+- **La información de las entidades se ve cortada**: Puedes arrastrar el manejador en la esquina inferior derecha de cada entidad para ensancharla. El texto se truncará con `...` si el espacio es insuficiente, pero puedes ver el valor completo pasando el ratón por encima.
 
 ## Licencia
-
 MIT — úsalo y modifícalo libremente.
 
-## Copyright
-
-Copyright (c) 2025 @crdsyntax
-
-Este proyecto se distribuye bajo la licencia MIT (ver `LICENSE`).
+Copyright (c) 2026 @crdsyntax

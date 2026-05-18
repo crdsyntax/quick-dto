@@ -8,19 +8,56 @@ import {
   EntityRelation,
   ErdDiagramData,
 } from "../types/erd-types";
+import { findPrismaSchema, parsePrismaSchema } from "./parser/prisma.parser";
 
 function logStep(msg: string) {
   process.stdout.write(`\n[WORKFLOW] ${msg}...\n`);
 }
 
 /**
- * Generate structured ERD data from TypeORM entities
+ * Generate structured ERD data from TypeORM entities or Prisma schema
  */
 export async function generateErdData(
   rootPath: string,
   rootEntityName: string,
   depth = 2
 ): Promise<ErdDiagramData> {
+  // Check for Prisma first
+  const prismaSchemaPath = findPrismaSchema(rootPath);
+  if (prismaSchemaPath) {
+    const content = fs.readFileSync(prismaSchemaPath, "utf8");
+    const entities = parsePrismaSchema(content);
+    
+    // Filtering logic similar to TypeORM
+    const visited = new Set<string>();
+    const queue: Array<{ name: string; level: number }> = [
+      { name: rootEntityName, level: 0 },
+    ];
+    const subEntities: Record<string, EntityData> = {};
+
+    while (queue.length > 0) {
+      const { name, level } = queue.shift()!;
+      if (visited.has(name) || level > depth) continue;
+
+      visited.add(name);
+      if (!entities[name]) continue;
+
+      subEntities[name] = entities[name];
+
+      for (const rel of entities[name].relations) {
+        if (entities[rel.targetEntity]) {
+          queue.push({ name: rel.targetEntity, level: level + 1 });
+        }
+      }
+    }
+
+    return {
+      entities: subEntities,
+      rootEntity: rootEntityName,
+    };
+  }
+
+  // Fallback to TypeORM
   const ENTITIES_PATH = rootPath + "/src/**/*.entity.ts";
 
   const project = new Project({
@@ -157,6 +194,41 @@ export async function generateErdDataForEntities(
   entityNames: string[],
   strict = false
 ): Promise<ErdDiagramData> {
+  // Check for Prisma
+  const prismaSchemaPath = findPrismaSchema(rootPath);
+  if (prismaSchemaPath) {
+    const content = fs.readFileSync(prismaSchemaPath, "utf8");
+    const entities = parsePrismaSchema(content);
+
+    const subEntities: Record<string, EntityData> = {};
+    const entitiesToInclude = new Set<string>(entityNames);
+
+    if (!strict) {
+      for (const name of entityNames) {
+        const entity = entities[name];
+        if (entity) {
+          for (const rel of entity.relations) {
+            if (entities[rel.targetEntity]) {
+              entitiesToInclude.add(rel.targetEntity);
+            }
+          }
+        }
+      }
+    }
+
+    for (const name of entitiesToInclude) {
+      if (entities[name]) {
+        subEntities[name] = entities[name];
+      }
+    }
+
+    return {
+      entities: subEntities,
+      rootEntity: entityNames[0] || "",
+    };
+  }
+
+  // Fallback to TypeORM
   const ENTITIES_PATH = rootPath + "/src/**/*.entity.ts";
 
   const project = new Project({
