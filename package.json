@@ -484,8 +484,11 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile -- --production",
-    "compile": "node esbuild.js",
+    "vscode:prepublish": "npm run compile:webview && npm run compile:extension -- --production",
+    "postinstall": "cd media/http-tester-react && npm install",
+    "compile:webview": "cd media/http-tester-react && npm run build",
+    "compile:extension": "node esbuild.js",
+    "compile": "npm run compile:webview && npm run compile:extension",
     "watch": "node esbuild.js --watch",
     "package": "vsce package",
     "publish": "vsce publish"

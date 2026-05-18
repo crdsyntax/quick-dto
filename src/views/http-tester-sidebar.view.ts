@@ -43,7 +43,8 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
     this._extensionUri = extensionUri;
     this._context = context;
     HttpTesterSidebarProvider.instance = this;
-    this.socketChannel = vscode.window.createOutputChannel("Socket Tester Log");
+    // Desactivado a petición del usuario (evita poblar el panel de salida inferior)
+    this.socketChannel = { appendLine: () => {}, dispose: () => {} } as any;
   }
 
   public resolveWebviewView(
@@ -320,17 +321,44 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
               });
             });
           } else if (msg.command === "clearCollections") {
-            const { HttpTesterPanel } = require("./http-tester.view");
-            await HttpTesterPanel.saveCollections(this._context, []);
-            vscode.window.showInformationMessage("Colecciones limpiadas");
-          } else if (msg.command === "deleteCollection") {
-            const currentCollections = this._loadGlobalCollections();
-            const updatedCollections = currentCollections.filter(
-              (c) => !(c.name === msg.name && c.type === msg.type)
+            const isAll = !msg.type;
+            const confirmMsg = isAll 
+              ? "¿Estás seguro de que deseas eliminar TODAS las colecciones? Esta acción no se puede deshacer."
+              : `¿Estás seguro de que deseas eliminar TODAS las colecciones de tipo ${msg.type.toUpperCase()}? Esta acción no se puede deshacer.`;
+
+            const confirmVal = await vscode.window.showWarningMessage(
+              confirmMsg,
+              { modal: true },
+              "Eliminar Todo"
             );
-            const { HttpTesterPanel } = require("./http-tester.view");
-            await HttpTesterPanel.saveCollections(this._context, updatedCollections);
-            vscode.window.showInformationMessage(`Colección '${msg.name}' eliminada`);
+            if (confirmVal === "Eliminar Todo") {
+              const currentCollections = this._loadGlobalCollections();
+              const updatedCollections = isAll 
+                ? [] 
+                : currentCollections.filter((c) => c.type !== msg.type);
+              const { HttpTesterPanel } = require("./http-tester.view");
+              await HttpTesterPanel.saveCollections(this._context, updatedCollections);
+              vscode.window.showInformationMessage(
+                isAll ? "Todas las colecciones han sido eliminadas" : `Colecciones de tipo ${msg.type.toUpperCase()} eliminadas`
+              );
+            }
+          } else if (msg.command === "deleteCollection") {
+            const confirmVal = await vscode.window.showWarningMessage(
+              `¿Estás seguro de que deseas eliminar la colección '${msg.name}' (${msg.type.toUpperCase()})?`,
+              { modal: true },
+              "Eliminar"
+            );
+            if (confirmVal === "Eliminar") {
+              const currentCollections = this._loadGlobalCollections();
+              const updatedCollections = currentCollections.filter(
+                (c) => !(c.name === msg.name && c.type === msg.type)
+              );
+              const { HttpTesterPanel } = require("./http-tester.view");
+              await HttpTesterPanel.saveCollections(this._context, updatedCollections);
+              vscode.window.showInformationMessage(`Colección '${msg.name}' eliminada`);
+            }
+          } else if (msg.command === "showToast") {
+            vscode.window.showInformationMessage(msg.message);
           } else if (msg.command === "ready") {
             this.refreshCollections();
             this._sendGlobalToken();

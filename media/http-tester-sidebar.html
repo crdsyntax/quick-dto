@@ -256,11 +256,9 @@
 
       // Clear Collections
       clearCollectionsButton.addEventListener("click", () => {
-        if (confirm("¿Estás seguro de que deseas eliminar todas las colecciones?")) {
-          vscode.postMessage({
-            command: "clearCollections"
-          });
-        }
+        vscode.postMessage({
+          command: "clearCollections"
+        });
       });
 
       // Save Global Token
@@ -392,13 +390,11 @@
             const name = btn.getAttribute('data-name');
             const type = btn.getAttribute('data-type');
             
-            if (confirm(`¿Estás seguro de que deseas eliminar la colección '${name}'?`)) {
-              vscode.postMessage({
-                command: "deleteCollection",
-                name: name,
-                type: type
-              });
-            }
+            vscode.postMessage({
+              command: "deleteCollection",
+              name: name,
+              type: type
+            });
           });
         });
       }

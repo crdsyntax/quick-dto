@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Tester</title>
+    <link rel="stylesheet" href="css/main.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>API Tester</h1>
+        <p>Prueba peticiones HTTP y eventos Socket.IO</p>
+        <button id="toggle-sidebar-button" class="action-button" style="display:inline-block; margin-top:10px; height: 30px; font-size: 13px; padding: 5px 15px;">Ocultar Panel de Colección</button>
+      </div>
+
+      <div class="main-wrapper">
+        <div id="collections-sidebar" class="collections-sidebar">
+          <h2 style="margin-bottom: 20px; font-size: 24px; color: #38bdf8">
+            Colecciones
+          </h2>
+
+          <div id="http-collection-controls" class="collection-controls">
+            <h3>HTTP Requests</h3>
+            <div class="collection-item-group">
+              <div style="flex-grow: 1">
+                <label for="http-collection-name">Nombre de Colección</label>
+                <input
+                  type="text"
+                  id="http-collection-name"
+                  placeholder="Nuevo Nombre"
+                />
+              </div>
+              <button
+                id="http-save-collection-button"
+                class="action-button"
+                style="align-self: flex-end; width: 100px"
+              >
+                Guardar
+              </button>
+            </div>
+
+            <div class="collection-item-group">
+              <div style="flex-grow: 1">
+                <label for="http-collection-select">Seleccionar</label>
+                <select id="http-collection-select">
+                  <option value="">-- Selecciona una Colección --</option>
+                </select>
+              </div>
+              <button
+                id="http-load-collection-button"
+                class="action-button"
+                style="align-self: flex-end; width: 80px"
+                disabled
+              >
+                Cargar
+              </button>
+              <button
+                  id="http-delete-collection-button"
+                  class="action-button"
+                  style="align-self: flex-end; width: 80px;"
+                  disabled
+                >
+                Eliminar
+              </button>
+            </div>
+            <div class="collection-item-group">
+              <button
+                id="http-import-json-button"
+                class="action-button"
+                style="width: 31%; font-size: 10px;"
+              >
+                📥 JSON
+              </button>
+              <button
+                id="http-export-json-button"
+                class="action-button"
+                style="width: 31%; font-size: 10px;"
+              >
+                📤 JSON
+              </button>
+              <button
+                id="http-import-swagger-button"
+                class="action-button"
+                style="width: 31%; font-size: 10px; background-color: #49cc90; color: white; border-color: #49cc90;"
+              >
+                ⚡ Swagger
+              </button>
+            </div>
+            <hr style="margin: 20px 0; border-color: #334155" />
+          </div>
+
+          <div
+            id="socket-collection-controls"
+            class="collection-controls"
+            style="display: none"
+          >
+            <h3>Socket.IO Events</h3>
+            <div class="collection-item-group">
+              <div style="flex-grow: 1">
+                <label for="socket-collection-name">Nombre de Colección</label>
+                <input
+                  type="text"
+                  id="socket-collection-name"
+                  placeholder="Nuevo Nombre"
+                />
+              </div>
+              <button
+                id="socket-save-collection-button"
+                class="action-button"
+                style="align-self: flex-end; width: 100px"
+              >
+                Guardar
+              </button>
+            </div>
+
+            <div class="collection-item-group">
+              <div style="flex-grow: 1">
+                <label for="socket-collection-select">Seleccionar</label>
+                <select id="socket-collection-select">
+                  <option value="">-- Selecciona una Colección --</option>
+                </select>
+              </div>
+              <button
+                id="socket-load-collection-button"
+                class="action-button"
+                style="align-self: flex-end; width: 80px"
+                disabled
+              >
+                Cargar
+              </button>
+              <button
+                  id="socket-delete-collection-button"
+                  class="action-button"
+                  style="align-self: flex-end; width: 80px;"
+                  disabled
+                >
+                Eliminar
+              </button>
+            </div>
+            <div class="collection-item-group">
+              <button
+                id="socket-import-json-button"
+                class="action-button"
+                style="width: 48%;"
+              >
+                📥 Importar JSON
+              </button>
+              <button
+                id="socket-export-json-button"
+                class="action-button"
+                style="width: 48%;"
+              >
+                📤 Exportar JSON
+              </button>
+            </div>
+            <hr style="margin: 20px 0; border-color: #334155" />
+          </div>
+        </div>
+
+        <div class="main-content">
+          <div class="tab-header">
+            <button class="tab-button active" data-tab="http">
+              HTTP Tester
+            </button>
+            <button class="tab-button" data-tab="socket">
+              Socket.IO Tester
+            </button>
+          </div>
+
+          <div id="http-tab" class="tab-content active">
+            <div class="request-line">
+              <select id="method-select">
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+                <option value="PATCH">PATCH</option>
+                <option value="HEAD">HEAD</option>
+                <option value="OPTIONS">OPTIONS</option>
+              </select>
+              <input type="text" id="url-input" placeholder="Enter URL" />
+              <button id="send-button" class="action-button">
+                Send Request
+              </button>
+            </div>
+
+            <!-- Repeat Request Controls -->
+            <div
+              style="
+                display: grid;
+                grid-template-columns: 1fr 1fr 150px;
+                gap: 15px;
+                margin-bottom: 20px;
+                align-items: end;
+              "
+            >
+              <div class="input-group" style="margin-bottom: 0">
+                <label for="repeat-count">Repeat Count</label>
+                <input
+                  type="number"
+                  id="repeat-count"
+                  min="1"
+                  max="1000"
+                  value="1"
+                  placeholder="1"
+                />
+              </div>
+              <div class="input-group" style="margin-bottom: 0">
+                <label for="content-type-select">Content Type</label>
+                <select id="content-type-select">
+                  <option value="json">JSON</option>
+                  <option value="formdata">FormData</option>
+                </select>
+              </div>
+              <button
+                id="repeat-button"
+                class="action-button"
+              >
+                Repeat Request
+              </button>
+            </div>
+
+            <div class="tab-auth-header http-tabs">
+              <button class="auth-tab-button active" data-auth="body">
+                Body
+              </button>
+              <button class="auth-tab-button" data-auth="params">
+                Query Params
+              </button>
+              <button class="auth-tab-button" data-auth="headers">
+                Headers
+              </button>
+              <button class="auth-tab-button" data-auth="files">Files</button>
+              <button class="auth-tab-button" data-auth="auth">Auth</button>
+            </div>
+
+            <div id="body-content" class="auth-content active">
+              <textarea
+                id="body-textarea"
+                placeholder="Request Body (JSON, XML, etc.)"
+              ></textarea>
+            </div>
+
+            <div id="params-content" class="auth-content">
+              <label>Query Parameters</label>
+              <div id="params-container" class="params-container"></div>
+              <button
+                id="add-param-button"
+                class="action-button"
+                style="margin-top: 10px"
+              >
+                + Add Param
+              </button>
+            </div>
+
+            <div id="headers-content" class="auth-content">
+              <label>Headers</label>
+              <div id="headers-container" class="headers-container"></div>
+              <button
+                id="add-header-button"
+                class="action-button"
+                style="margin-top: 10px"
+              >
+                + Add Header
+              </button>
+            </div>
+
+            <div id="files-content" class="auth-content">
+              <label>Files (FormData)</label>
+              <div id="files-container" class="params-container">
+                <!-- File rows will be added here -->
+              </div>
+              <button
+                id="add-file-button"
+                class="action-button"
+                style="margin-top: 10px"
+              >
+                + Add File
+              </button>
+            </div>
+
+            <div id="auth-content" class="auth-content">
+              <div class="tab-auth-header">
+                <button class="auth-tab-button active" data-auth-type="global">
+                  Global (Inherit)
+                </button>
+                <button class="auth-tab-button" data-auth-type="none">
+                  None
+                </button>
+                <button class="auth-tab-button" data-auth-type="bearer">
+                  Bearer Token
+                </button>
+                <button class="auth-tab-button" data-auth-type="basic">
+                  Basic Auth
+                </button>
+              </div>
+
+              <div id="auth-global" class="auth-content active">
+                <p>Using global authentication token from sidebar.</p>
+                <div id="global-token-status" style="margin-top: 10px; color: #888; font-style: italic;">
+                  Global Token: <span id="current-global-token">Not set</span>
+                </div>
+              </div>
+
+              <div id="auth-none" class="auth-content">
+                <p>No authentication will be used.</p>
+              </div>
+
+              <div id="auth-bearer" class="auth-content">
+                <label for="bearer-token">Token</label>
+                <input
+                  type="text"
+                  id="bearer-token"
+                  placeholder="Enter Bearer Token"
+                />
+              </div>
+
+              <div id="auth-basic" class="auth-content">
+                <div class="input-group">
+                  <label for="basic-username">Username</label>
+                  <input
+                    type="text"
+                    id="basic-username"
+                    placeholder="Enter Username"
+                  />
+                </div>
+                <div class="input-group">
+                  <label for="basic-password">Password</label>
+                  <input
+                    type="password"
+                    id="basic-password"
+                    placeholder="Enter Password"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div
+              id="response-container"
+              class="response-container"
+              style="display: none"
+            >
+              <div id="response-header" class="response-header"></div>
+              <div id="response-content" class="response-content">
+                <pre id="response-data" class="response-data"></pre>
+              </div>
+            </div>
+          </div>
+
+          <div id="socket-tab" class="tab-content">
+            <div class="socket-layout">
+              <!-- Left Column: Config -->
+              <div class="socket-config-col">
+                <h2>Connection</h2>
+                <div class="input-group">
+                  <label for="socket-url-input">URL</label>
+                  <input type="text" id="socket-url-input" placeholder="http://localhost:3000" />
+                </div>
+                <div class="input-group">
+                  <label for="socket-path-input">Path</label>
+                  <input type="text" id="socket-path-input" placeholder="/socket.io" />
+                </div>
+                <div class="input-group">
+                  <label for="socket-token-input">Auth Token (Bearer)</label>
+                  <input type="text" id="socket-token-input" placeholder="Optional Token" />
+                </div>
+                <div class="input-group">
+                  <label for="socket-user-id">User ID (join room)</label>
+                  <input type="text" id="socket-user-id" placeholder="Optional User ID" />
+                </div>
+                
+                <div class="socket-action-group">
+                  <button id="socket-connect-button" class="action-button">Connect</button>
+                  <button id="socket-disconnect-button" class="action-button" style="display: none">Disconnect</button>
+                  <span id="socket-status" class="status-indicator disconnected">Disconnected</span>
+                </div>
+              </div>
+
+              <!-- Right Column: Interactive Tabs -->
+              <div class="socket-main-col">
+                <div class="socket-tabs-header">
+                  <button class="socket-tab-btn active" data-socket-tab="emit">Emit Event</button>
+                  <button class="socket-tab-btn" data-socket-tab="listen">Listen Event</button>
+                  <button class="socket-tab-btn" data-socket-tab="logs">Socket Logs</button>
+                </div>
+                
+                <!-- Tab: Emit -->
+                <div class="socket-tab-content active" id="socket-emit-tab">
+                  <div class="input-group">
+                    <label for="socket-event-name">Event Name</label>
+                    <input type="text" id="socket-event-name" value="message" placeholder="e.g., newMessage" />
+                  </div>
+                  <div class="input-group" style="flex-grow: 1; display: flex; flex-direction: column;">
+                    <label for="socket-payload-textarea">Payload (JSON)</label>
+                    <textarea id="socket-payload-textarea" style="flex-grow: 1; min-height: 300px;">{}</textarea>
+                  </div>
+                  <button id="socket-emit-button" class="action-button" disabled style="margin-top: 10px;">
+                    Emit Event
+                  </button>
+                </div>
+
+                <!-- Tab: Listen -->
+                <div class="socket-tab-content" id="socket-listen-tab">
+                  <div class="socket-payload-group" style="grid-template-columns: 1fr 120px 120px; gap: 10px; margin-bottom: 15px;">
+                    <div class="input-group" style="margin-bottom: 0;">
+                      <label for="socket-listen-event-name">Event Name Listener</label>
+                      <input type="text" id="socket-listen-event-name" value="message" placeholder="e.g., newMessage" />
+                    </div>
+                    <button id="socket-listen-button" class="action-button" disabled>Escuchar</button>
+                    <button id="clear-listen-log-button" class="action-button" disabled>Limpiar</button>
+                  </div>
+                  <div id="socket-listen-log-container" class="log-container" style="flex-grow: 1; height: auto;"></div>
+                </div>
+
+                <!-- Tab: Logs -->
+                <div class="socket-tab-content" id="socket-logs-tab">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h2 style="font-size: 14px; color: #888; text-transform: uppercase;">Connection Logs</h2>
+                    <button id="clear-socket-log-button" class="action-button" style="height: 30px; padding: 5px 10px; font-size: 11px;">Limpiar Logs</button>
+                  </div>
+                  <div id="socket-log-container" class="log-container" style="flex-grow: 1; height: auto;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="loading-overlay" class="loading-overlay">
+      <div class="spinner"></div>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

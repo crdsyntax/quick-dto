@@ -65,13 +65,9 @@ export class HttpTesterPanel {
     // Manejar el cierre del panel
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
-    // Inicializar los canales de salida del socket con nombres únicos
-    this.socketChannel = vscode.window.createOutputChannel(
-      `Socket Tester Log #${HttpTesterPanel.panels.length + 1}`
-    );
-    this.listenChannel = vscode.window.createOutputChannel(
-      `Socket Listen Log #${HttpTesterPanel.panels.length + 1}`
-    );
+    // Inicializar los canales de salida del socket desactivados a petición del usuario (evita poblar el panel de salida inferior)
+    this.socketChannel = { appendLine: () => {}, dispose: () => {} } as any;
+    this.listenChannel = { appendLine: () => {}, dispose: () => {} } as any;
 
     // Añadir a la lista de paneles activos
     HttpTesterPanel.panels.push(this);
@@ -163,22 +159,38 @@ export class HttpTesterPanel {
   }
 
   private _getHtmlForWebview(panelId: string): string {
-    const htmlPath = vscode.Uri.joinPath(
-      this._extensionUri,
-      "media",
-      "http-tester.html"
+    const webview = this._panel.webview;
+
+    // Obtener URIs locales de los recursos compilados de Vite
+    const scriptUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, "media", "http-tester-react", "dist", "assets", "index.js")
     );
-    let html = fs.readFileSync(htmlPath.fsPath, "utf8");
-
-    const rootUri = this._panel.webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, "media")
+    const styleUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, "media", "http-tester-react", "dist", "assets", "index.css")
     );
 
-    // Inyectar el ID del panel en el HTML para identificación
-    html = html.replace(/{{root}}/g, rootUri.toString());
-    html = html.replace(/{{panelId}}/g, panelId);
+    const cspSource = webview.cspSource;
 
-    return html;
+    return `<!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <!-- Content Security Policy -->
+          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src ${cspSource}; connect-src *;">
+          <title>API Tester</title>
+          <link rel="stylesheet" href="${styleUri}">
+        </head>
+        <body class="bg-[#050505] text-[#d1d1d1] min-h-screen font-mono">
+          <div id="root"></div>
+          
+          <script>
+            // Inyectar el ID del panel globalmente para que el hook lo use
+            window.vscodePanelId = "${panelId}";
+          </script>
+          <script src="${scriptUri}"></script>
+        </body>
+      </html>`;
   }
 
   // --- Lógica de Socket.IO Helper Methods ---
@@ -432,16 +444,61 @@ export class HttpTesterPanel {
           } else if (msg.command === "saveCollections") {
             await this._saveCollections(msg.collections);
           } else if (msg.command === "deleteCollection") {
-            const currentCollections = this._loadCollections();
-            const updatedCollections = currentCollections.filter(
-              (c) => !(c.name === msg.name && c.type === msg.type)
+            const confirmVal = await vscode.window.showWarningMessage(
+              `¿Estás seguro de que deseas eliminar la colección '${msg.name}' (${msg.type.toUpperCase()})?`,
+              { modal: true },
+              "Eliminar"
             );
-            await HttpTesterPanel.saveCollections(HttpTesterPanel._context, updatedCollections);
+            if (confirmVal === "Eliminar") {
+              const currentCollections = this._loadCollections();
+              const updatedCollections = currentCollections.filter(
+                (c) => !(c.name === msg.name && c.type === msg.type)
+              );
+              await HttpTesterPanel.saveCollections(HttpTesterPanel._context, updatedCollections);
+              vscode.window.showInformationMessage(`Colección '${msg.name}' eliminada`);
+            }
+          } else if (msg.command === "clearCollections") {
+            const isAll = !msg.type;
+            const confirmMsg = isAll 
+              ? "¿Estás seguro de que deseas eliminar TODAS las colecciones? Esta acción no se puede deshacer."
+              : `¿Estás seguro de que deseas eliminar TODAS las colecciones de tipo ${msg.type.toUpperCase()}? Esta acción no se puede deshacer.`;
+
+            const confirmVal = await vscode.window.showWarningMessage(
+              confirmMsg,
+              { modal: true },
+              "Eliminar Todo"
+            );
+            if (confirmVal === "Eliminar Todo") {
+              const currentCollections = this._loadCollections();
+              const updatedCollections = isAll 
+                ? [] 
+                : currentCollections.filter((c) => c.type !== msg.type);
+              await HttpTesterPanel.saveCollections(HttpTesterPanel._context, updatedCollections);
+              vscode.window.showInformationMessage(
+                isAll ? "Todas las colecciones han sido eliminadas" : `Colecciones de tipo ${msg.type.toUpperCase()} eliminadas`
+              );
+            }
+          } else if (msg.command === "showToast") {
+            vscode.window.showInformationMessage(msg.message);
           } else if (msg.command === "saveLastRequest") {
             await HttpTesterPanel._context?.globalState.update(
               HttpTesterPanel.LAST_REQUEST_STORAGE_KEY,
               msg.request
             );
+          } else if (msg.command === "saveGlobalToken") {
+            this._globalToken = msg.token || "";
+            await HttpTesterPanel._context?.globalState.update(
+              "httpTester.globalToken",
+              this._globalToken
+            );
+            // Sync all panels
+            HttpTesterPanel.panels.forEach((p) => {
+              p._globalToken = this._globalToken;
+              p._panel.webview.postMessage({
+                command: "loadGlobalToken",
+                token: this._globalToken,
+              });
+            });
           } else if (msg.command === "importSwagger") {
             await this._handleImportSwagger(msg.url);
           } else if (msg.command === "detectSwagger") {
