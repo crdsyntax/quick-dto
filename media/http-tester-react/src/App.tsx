@@ -3,9 +3,10 @@ import { useVSCode } from './hooks/useVSCode';
 import { Sidebar } from './components/Sidebar';
 import { HttpPanel } from './components/HttpPanel';
 import { SocketPanel } from './components/SocketPanel';
+import { CurlPanel } from './components/CurlPanel';
 import { MetricsPanel } from './components/MetricsPanel';
 import { Collection, HttpResponse } from './types';
-import { Globe, TerminalSquare } from 'lucide-react';
+import { Globe, TerminalSquare, Terminal } from 'lucide-react';
 
 interface SocketLog {
   time: string;
@@ -18,7 +19,7 @@ const App: React.FC = () => {
   const { postMessage, getState, setState } = useVSCode();
 
   // App General State
-  const [currentTab, setCurrentTab] = useState<'http' | 'socket' | 'metrics'>('http');
+  const [currentTab, setCurrentTab] = useState<'http' | 'socket' | 'metrics' | 'curl'>('http');
   const [showSidebar, setShowSidebar] = useState(true);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [selectedCollectionName, setSelectedCollectionName] = useState('');
@@ -317,6 +318,36 @@ const App: React.FC = () => {
     setIsLoading(true);
   };
 
+  const handleCurlImport = (parsedRequest: any, autoRun: boolean) => {
+    const mappedHeaders = Object.entries(parsedRequest.headers || {}).map(([key, value]) => ({
+      key,
+      value: String(value)
+    }));
+
+    if (!mappedHeaders.some(h => h.key.toLowerCase() === 'content-type') && parsedRequest.body) {
+        mappedHeaders.push({ key: 'Content-Type', value: 'application/json' });
+    }
+
+    const state = {
+      url: parsedRequest.url,
+      method: parsedRequest.method,
+      body: typeof parsedRequest.body === 'object' ? JSON.stringify(parsedRequest.body, null, 2) : String(parsedRequest.body || ''),
+      headers: mappedHeaders,
+      queryParams: parsedRequest.queryParams || [],
+      authType: parsedRequest.authType || 'none',
+      authToken: parsedRequest.authToken || '',
+      basicUsername: parsedRequest.basicUsername || '',
+      basicPassword: parsedRequest.basicPassword || '',
+    };
+
+    triggerHttpLoad(state);
+    setCurrentTab('http');
+
+    if (autoRun) {
+      handleSendRequest(state);
+    }
+  };
+
   // HTTP Panel actions
   const handleSendRequest = (request: any, count?: number) => {
     setIsLoading(true);
@@ -438,6 +469,20 @@ const App: React.FC = () => {
             </button>
             <button
               onClick={() => {
+                setCurrentTab('curl');
+                setSelectedCollectionName('');
+              }}
+              className={`px-6 py-3 font-bold uppercase tracking-wider text-sm transition-all border-b-4 flex items-center gap-2 ${
+                currentTab === 'curl'
+                  ? 'border-textMain text-accentLight bg-bgPanel'
+                  : 'border-transparent text-textMuted hover:text-textMain'
+              }`}
+            >
+              <Terminal className="w-4 h-4" />
+              &gt; CURL_MODE
+            </button>
+            <button
+              onClick={() => {
                 setCurrentTab('socket');
                 setSelectedCollectionName('');
                 postMessage('socketGetInitialState');
@@ -476,6 +521,10 @@ const App: React.FC = () => {
                 response={httpResponse}
                 globalToken={globalToken}
                 onStateChange={handleHttpStateChange}
+              />
+            ) : currentTab === 'curl' ? (
+              <CurlPanel 
+                onImport={handleCurlImport}
               />
             ) : currentTab === 'socket' ? (
               <SocketPanel
