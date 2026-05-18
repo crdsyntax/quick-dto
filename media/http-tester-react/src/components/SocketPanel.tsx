@@ -44,6 +44,7 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
   const [userId, setUserId] = useState('');
   const [eventName, setEventName] = useState('message');
   const [payload, setPayload] = useState('{}');
+  const [transportMode, setTransportMode] = useState<'auto' | 'websocket' | 'polling'>('auto');
   const [listenEventName, setListenEventName] = useState('message');
   const [activeTab, setActiveTab] = useState<'emit' | 'listen' | 'logs'>('emit');
 
@@ -58,8 +59,9 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
       userId,
       eventName,
       payload,
+      transports: transportMode === 'auto' ? ['polling', 'websocket'] : [transportMode],
     });
-  }, [url, path, token, userId, eventName, payload]);
+  }, [url, path, token, userId, eventName, payload, transportMode]);
 
   // Load external state ONLY when loadId changes
   useEffect(() => {
@@ -70,6 +72,12 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
       setUserId(initialState.userId || '');
       setEventName(initialState.eventName || 'message');
       setPayload(initialState.payload || '{}');
+      
+      const transports = initialState.transports || [];
+      if (transports.length === 2) setTransportMode('auto');
+      else if (transports[0] === 'websocket') setTransportMode('websocket');
+      else if (transports[0] === 'polling') setTransportMode('polling');
+      else setTransportMode('auto');
     }
   }, [loadId]);
 
@@ -81,6 +89,7 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
       userId,
       eventName,
       payload,
+      transports: transportMode === 'auto' ? ['polling', 'websocket'] : [transportMode],
     });
   };
 
@@ -88,12 +97,16 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
     <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 w-full items-start">
       {/* Left Column: Config */}
       <div className="bg-bgPanel p-5 border-2 border-borderDark rounded-none flex flex-col gap-4 shadow-retro-dark">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-textMuted border-b-2 border-borderDark pb-2">
-          &gt; CONNECTION CONFIG
+        <h2 className="text-sm font-bold uppercase tracking-wider text-textMuted border-b-2 border-borderDark pb-2 flex items-center justify-between">
+          <span>&gt; SOCKET.IO CONFIG</span>
+          <span className="text-[10px] bg-accentLight text-bgDark px-1 rounded-none">V4.X+</span>
         </h2>
 
         <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-bold uppercase text-textMuted">URL</label>
+          <label className="text-[11px] font-bold uppercase text-textMuted flex items-center justify-between">
+            URL
+            <span className="text-[9px] lowercase italic opacity-70">http://domain.com</span>
+          </label>
           <input
             type="text"
             value={url}
@@ -105,7 +118,10 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-bold uppercase text-textMuted">PATH</label>
+          <label className="text-[11px] font-bold uppercase text-textMuted flex items-center justify-between">
+            PATH
+            <span className="text-[9px] lowercase italic opacity-70">default: /socket.io</span>
+          </label>
           <input
             type="text"
             value={path}
@@ -114,6 +130,29 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
             placeholder="/socket.io"
             className="p-2 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none disabled:opacity-50"
           />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] font-bold uppercase text-textMuted">TRANSPORT PROTOCOL</label>
+          <div className="grid grid-cols-3 border-2 border-borderDark rounded-none overflow-hidden h-9">
+            {(['auto', 'websocket', 'polling'] as const).map((mode) => (
+              <button
+                key={mode}
+                disabled={isConnected}
+                onClick={() => setTransportMode(mode)}
+                className={`text-[10px] font-bold uppercase transition flex items-center justify-center ${
+                  transportMode === mode 
+                    ? 'bg-textMain text-bgDark' 
+                    : 'bg-bgDark text-textMuted hover:text-textMain'
+                } disabled:opacity-50`}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+          <p className="text-[9px] text-textMuted italic mt-1 leading-tight">
+            * Note: This tool uses Socket.IO protocol. Raw WebSockets may not be compatible.
+          </p>
         </div>
 
         <div className="flex flex-col gap-1">

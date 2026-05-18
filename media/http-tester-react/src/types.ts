@@ -30,6 +30,7 @@ export interface SocketRequest {
   eventName: string;
   payload: string;
   path: string;
+  transports?: ('websocket' | 'polling')[];
 }
 
 export interface Collection {
@@ -52,6 +53,7 @@ export interface Collection {
   eventName?: string;
   payload?: string;
   path?: string;
+  transports?: ('websocket' | 'polling')[];
 }
 
 export interface HttpResponse {

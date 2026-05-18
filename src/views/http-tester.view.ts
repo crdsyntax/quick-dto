@@ -13,6 +13,7 @@ interface SocketTesterState {
   eventName: string;
   payload: string;
   path: string;
+  transports?: ("websocket" | "polling")[];
 }
 
 export class HttpTesterPanel {
@@ -36,6 +37,7 @@ export class HttpTesterPanel {
     eventName: "",
     payload: "{\n  \n}",
     path: "",
+    transports: ["polling", "websocket"],
   };
 
   private _lastSocketStatus: { text: string; class: string } = {
@@ -233,7 +235,7 @@ export class HttpTesterPanel {
 
     // Conexión con opciones de autenticación y query
     this.socket = io(state.url, {
-      transports: ["websocket", "polling"],
+      transports: state.transports || ["websocket", "polling"],
       path: state.path || "/socket.io",
       auth: state.token ? { token: state.token } : undefined,
       query: state.userId ? { userId: state.userId } : undefined,
