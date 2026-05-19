@@ -55,8 +55,55 @@
         color: var(--vscode-button-secondaryForeground);
       }
 
+      .button.zap {
+        background-color: #f59e0b;
+        color: white;
+      }
+
+      .button.zap:hover {
+        background-color: #d97706;
+      }
+
+      .button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
       .section {
         margin-bottom: 20px;
+      }
+
+      .input-group {
+        margin-bottom: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .input-group label {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--vscode-descriptionForeground);
+      }
+
+      .input-row {
+        display: flex;
+        gap: 4px;
+      }
+
+      input, select {
+        flex: 1;
+        padding: 6px;
+        background: var(--vscode-input-background);
+        color: var(--vscode-input-foreground);
+        border: 1px solid var(--vscode-input-border);
+        border-radius: 2px;
+        font-size: 12px;
+      }
+
+      input:focus {
+        outline: 1px solid var(--vscode-focusBorder);
       }
 
       .section-title {
@@ -65,6 +112,8 @@
         text-transform: uppercase;
         color: var(--vscode-descriptionForeground);
         margin-bottom: 8px;
+        border-bottom: 1px solid var(--vscode-panel-border);
+        padding-bottom: 4px;
       }
 
       .group-container {
@@ -202,22 +251,46 @@
       <button class="button primary" id="open-editor-button">
         ✨ Nueva ventana
       </button>
-      <button class="button import-button" id="import-json-button">
-        📥 Importar coleccion JSON
+      <button class="button zap" id="detect-swagger-button">
+        ⚡ Detectar Swagger
       </button>
-      <button class="button secondary" id="export-json-button">
-        📤 Exportar coleccion JSON
+      <div style="display: flex; gap: 4px;">
+        <button class="button import-button" id="import-json-button" style="margin-bottom: 0;">
+          📥 Importar
+        </button>
+        <button class="button secondary" id="export-json-button" style="margin-bottom: 0;">
+          📤 Exportar
+        </button>
+      </div>
+      <button class="button" id="clear-collections-button" style="background-color: var(--vscode-errorForeground); color: white; margin-top: 8px;">
+        🗑️ Limpiar Todo
       </button>
-      <button class="button" id="clear-collections-button" style="background-color: var(--vscode-errorForeground); color: white;">
-        🗑️ Limpiar Colecciones
-      </button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Nueva Colección</div>
+      <div class="input-group">
+        <label>Nombre</label>
+        <div class="input-row">
+          <input type="text" id="new-collection-name" placeholder="Ej: Auth API">
+          <button class="button primary" id="save-collection-button" style="width: auto; margin-bottom: 0; padding: 4px 8px;">
+            💾
+          </button>
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Tipo</label>
+        <select id="new-collection-type">
+          <option value="http">HTTP</option>
+          <option value="socket">Socket.IO</option>
+        </select>
+      </div>
     </div>
 
     <div class="section">
       <div class="section-title">Global Auth (Bearer)</div>
       <div style="margin-bottom: 8px; display: flex; gap: 4px;">
-        <input type="password" id="global-token" placeholder="Token Global" 
-               style="flex: 1; padding: 6px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 2px; font-size: 12px;">
+        <input type="password" id="global-token" placeholder="Token Global">
         <button class="button primary" id="save-global-token" style="width: auto; margin-bottom: 0; padding: 4px 8px;">
           💾
         </button>
@@ -242,6 +315,7 @@
       const vscode = acquireVsCodeApi();
 
       const openEditorButton = document.getElementById("open-editor-button");
+      const detectSwaggerButton = document.getElementById("detect-swagger-button");
       const importJsonButton = document.getElementById("import-json-button");
       const exportJsonButton = document.getElementById("export-json-button");
       const clearCollectionsButton = document.getElementById("clear-collections-button");
@@ -249,10 +323,50 @@
       const socketCollectionsContainer = document.getElementById("socket-collections-container");
       const globalTokenInput = document.getElementById("global-token");
       const saveGlobalTokenButton = document.getElementById("save-global-token");
+      
+      const newCollectionName = document.getElementById("new-collection-name");
+      const newCollectionType = document.getElementById("new-collection-type");
+      const saveCollectionButton = document.getElementById("save-collection-button");
 
       let collections = [];
       let currentTab = "http";
       let collapsedGroups = new Set();
+
+      // Detect Swagger
+      detectSwaggerButton.addEventListener("click", () => {
+        detectSwaggerButton.disabled = true;
+        detectSwaggerButton.textContent = "⚡ Buscando...";
+        vscode.postMessage({
+          command: "detectSwagger"
+        });
+      });
+
+      // Save New Collection
+      saveCollectionButton.addEventListener("click", () => {
+        const name = newCollectionName.value.trim();
+        if (!name) {
+          alert("Introduce un nombre para la colección");
+          return;
+        }
+
+        vscode.postMessage({
+          command: "saveCollection",
+          collection: {
+            name: name,
+            type: newCollectionType.value,
+            url: "http://localhost:3000", // Default URL
+            method: "GET",
+            body: "{}",
+            queryParams: [],
+            headers: [],
+            authType: "none",
+            authToken: "",
+            basicUsername: "",
+            basicPassword: ""
+          }
+        });
+        newCollectionName.value = "";
+      });
 
       // Clear Collections
       clearCollectionsButton.addEventListener("click", () => {
@@ -415,19 +529,16 @@
               globalTokenInput.value = message.token;
             }
             break;
+          case "stopLoading":
+            detectSwaggerButton.disabled = false;
+            detectSwaggerButton.textContent = "⚡ Detectar Swagger";
+            break;
           case "importedCollections":
-            if (message.collections && Array.isArray(message.collections)) {
-              // Add imported collections
-              message.collections.forEach(importedCol => {
-                const exists = collections.find(
-                  c => c.name === importedCol.name && c.type === importedCol.type
-                );
-                if (!exists) {
-                  collections.push(importedCol);
-                }
-              });
-              renderCollections();
-            }
+            // En el backend ya se guardaron, así que solo esperamos el loadCollections
+            // o refrescamos localmente si es necesario. 
+            // Pero para feedback visual rápido:
+            detectSwaggerButton.disabled = false;
+            detectSwaggerButton.textContent = "⚡ Detectar Swagger";
             break;
         }
       });

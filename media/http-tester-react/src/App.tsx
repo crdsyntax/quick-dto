@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useVSCode } from './hooks/useVSCode';
-import { Sidebar } from './components/Sidebar';
 import { HttpPanel } from './components/HttpPanel';
 import { SocketPanel } from './components/SocketPanel';
 import { CurlPanel } from './components/CurlPanel';
@@ -20,7 +19,6 @@ const App: React.FC = () => {
 
   // App General State
   const [currentTab, setCurrentTab] = useState<'http' | 'socket' | 'metrics' | 'curl'>('http');
-  const [showSidebar, setShowSidebar] = useState(true);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [selectedCollectionName, setSelectedCollectionName] = useState('');
   const [globalToken, setGlobalToken] = useState('');
@@ -259,65 +257,6 @@ const App: React.FC = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, [postMessage, getState, setState, collections]);
 
-  // Sidebar controls
-  const handleSelectCollection = (name: string) => {
-    setSelectedCollectionName(name);
-    const col = collections.find((c) => c.name === name && c.type === currentTab);
-    if (col) {
-      if (currentTab === 'http') {
-        triggerHttpLoad(col);
-      } else {
-        triggerSocketLoad(col);
-      }
-      postMessage('showToast', { message: `COLECCIÓN '${name}' (${currentTab.toUpperCase()}) CARGADA.` });
-    }
-  };
-
-  const handleSaveCollection = (name: string) => {
-    const currentState = currentTab === 'http' ? httpFormState : socketFormState;
-    const newCollection: Collection = {
-      name,
-      type: currentTab,
-      ...currentState,
-    };
-
-    setCollections((prev) => {
-      const idx = prev.findIndex((c) => c.name === name && c.type === currentTab);
-      const next = [...prev];
-      if (idx !== -1) {
-        next[idx] = newCollection;
-      } else {
-        next.push(newCollection);
-      }
-      postMessage('saveCollections', { collections: next });
-      return next;
-    });
-
-    postMessage('showToast', { message: `COLECCIÓN '${name}' (${currentTab.toUpperCase()}) GUARDADA.` });
-  };
-
-  const handleDeleteCollection = (name: string) => {
-    if (!name) return;
-    postMessage('deleteCollection', { name, type: currentTab });
-  };
-
-  const handleClearCollections = () => {
-    postMessage('clearCollections', { type: currentTab });
-  };
-
-  const handleImportJson = () => {
-    postMessage('importJson', { type: currentTab });
-  };
-
-  const handleExportJson = () => {
-    postMessage('exportJson', { type: currentTab, collections });
-  };
-
-  const handleDetectSwagger = () => {
-    postMessage('detectSwagger');
-    setIsLoading(true);
-  };
-
   const handleCurlImport = (parsedRequest: any, autoRun: boolean) => {
     const mappedHeaders = Object.entries(parsedRequest.headers || {}).map(([key, value]) => ({
       key,
@@ -425,32 +364,12 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex gap-3">
-          <button
-            onClick={() => setShowSidebar(!showSidebar)}
-            className="px-5 py-2.5 bg-bgDark border-2 border-borderDark hover:bg-textMain hover:text-bgDark text-textMain transition font-bold rounded-none text-xs uppercase"
-          >
-            {showSidebar ? 'OCULTAR SIDEBAR [X]' : 'MOSTRAR SIDEBAR [ ]'}
-          </button>
+          {/* Sidebar controls removed - functionality moved to VS Code Sidebar */}
         </div>
       </header>
 
       {/* Main Content Area */}
       <div className="flex gap-6 items-start">
-        {showSidebar && (
-          <Sidebar
-            collections={collections}
-            currentTab={currentTab}
-            selectedCollectionName={selectedCollectionName}
-            onSelectCollection={handleSelectCollection}
-            onSaveCollection={handleSaveCollection}
-            onDeleteCollection={handleDeleteCollection}
-            onClearCollections={handleClearCollections}
-            onImportJson={handleImportJson}
-            onExportJson={handleExportJson}
-            onDetectSwagger={handleDetectSwagger}
-          />
-        )}
-
         <main className="flex-grow flex flex-col gap-5 min-w-0">
           {/* Main Tabs */}
           <div className="flex border-b-4 border-borderDark">
