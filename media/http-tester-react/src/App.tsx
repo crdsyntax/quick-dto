@@ -288,7 +288,7 @@ const App: React.FC = () => {
   };
 
   // HTTP Panel actions
-  const handleSendRequest = (request: any, count?: number) => {
+  const handleSendRequest = (request: any, count?: number, delay?: number) => {
     setIsLoading(true);
     setHttpResponse(null);
 
@@ -321,7 +321,7 @@ const App: React.FC = () => {
     }
 
     if (count && count > 1) {
-      postMessage('repeatRequest', { request: payload, repeatCount: count });
+      postMessage('repeatRequest', { request: payload, repeatCount: count, delay });
     } else {
       postMessage('sendRequest', { request: payload });
     }
@@ -344,6 +344,10 @@ const App: React.FC = () => {
 
   const handleSocketListen = (name: string) => {
     postMessage('socketListen', { data: { eventName: name } });
+  };
+
+  const handleSaveCollection = (collection: Collection) => {
+    postMessage('saveCollection', { collection });
   };
 
   return (
@@ -436,6 +440,7 @@ const App: React.FC = () => {
                 initialState={httpFormState}
                 loadId={httpLoadId}
                 onSendRequest={handleSendRequest}
+                onSaveCollection={handleSaveCollection}
                 isLoading={isLoading}
                 response={httpResponse}
                 globalToken={globalToken}
@@ -454,6 +459,7 @@ const App: React.FC = () => {
                 onDisconnect={handleSocketDisconnect}
                 onEmit={handleSocketEmit}
                 onListen={handleSocketListen}
+                onSaveCollection={handleSaveCollection}
                 connectionLogs={connectionLogs}
                 listenLogs={listenLogs}
                 onClearConnectionLogs={() => setConnectionLogs([])}

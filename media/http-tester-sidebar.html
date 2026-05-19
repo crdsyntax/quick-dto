@@ -279,6 +279,10 @@
         </div>
       </div>
       <div class="input-group">
+        <label>Grupo</label>
+        <input type="text" id="new-collection-group" placeholder="Ej: Usuarios">
+      </div>
+      <div class="input-group">
         <label>Tipo</label>
         <select id="new-collection-type">
           <option value="http">HTTP</option>
@@ -325,6 +329,7 @@
       const saveGlobalTokenButton = document.getElementById("save-global-token");
       
       const newCollectionName = document.getElementById("new-collection-name");
+      const newCollectionGroup = document.getElementById("new-collection-group");
       const newCollectionType = document.getElementById("new-collection-type");
       const saveCollectionButton = document.getElementById("save-collection-button");
 
@@ -344,6 +349,7 @@
       // Save New Collection
       saveCollectionButton.addEventListener("click", () => {
         const name = newCollectionName.value.trim();
+        const group = newCollectionGroup.value.trim();
         if (!name) {
           alert("Introduce un nombre para la colección");
           return;
@@ -353,6 +359,7 @@
           command: "saveCollection",
           collection: {
             name: name,
+            group: group,
             type: newCollectionType.value,
             url: "http://localhost:3000", // Default URL
             method: "GET",
@@ -366,6 +373,7 @@
           }
         });
         newCollectionName.value = "";
+        newCollectionGroup.value = "";
       });
 
       // Clear Collections

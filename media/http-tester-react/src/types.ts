@@ -36,6 +36,7 @@ export interface SocketRequest {
 export interface Collection {
   name: string;
   type: 'http' | 'socket';
+  group?: string;
   // Common
   url?: string;
   // HTTP

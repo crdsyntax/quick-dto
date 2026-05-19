@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SocketRequest } from '../types';
-import { Power, Send, Radio, Terminal, Trash2 } from 'lucide-react';
+import { Power, Send, Radio, Terminal, Trash2, Save } from 'lucide-react';
 
 interface SocketLog {
   time: string;
@@ -17,6 +17,7 @@ interface SocketPanelProps {
   onDisconnect: () => void;
   onEmit: (eventName: string, payload: string) => void;
   onListen: (eventName: string) => void;
+  onSaveCollection: (collection: any) => void;
   connectionLogs: SocketLog[];
   listenLogs: SocketLog[];
   onClearConnectionLogs: () => void;
@@ -32,6 +33,7 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
   onDisconnect,
   onEmit,
   onListen,
+  onSaveCollection,
   connectionLogs,
   listenLogs,
   onClearConnectionLogs,
@@ -46,6 +48,8 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
   const [payload, setPayload] = useState('{}');
   const [transportMode, setTransportMode] = useState<'auto' | 'websocket' | 'polling'>('auto');
   const [listenEventName, setListenEventName] = useState('message');
+  const [collectionName, setCollectionName] = useState('');
+  const [collectionGroup, setCollectionGroup] = useState('');
   const [activeTab, setActiveTab] = useState<'emit' | 'listen' | 'logs'>('emit');
 
   const isConnected = socketStatus.className === 'connected';
@@ -72,6 +76,8 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
       setUserId(initialState.userId || '');
       setEventName(initialState.eventName || 'message');
       setPayload(initialState.payload || '{}');
+      setCollectionName(initialState.name || '');
+      setCollectionGroup(initialState.group || '');
       
       const transports = initialState.transports || [];
       if (transports.length === 2) setTransportMode('auto');
@@ -93,9 +99,63 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
     });
   };
 
+  const handleSave = () => {
+    if (!collectionName) {
+      alert('POR FAVOR INGRESA UN NOMBRE PARA LA COLECCIÓN');
+      return;
+    }
+
+    const collectionData = {
+      name: collectionName,
+      group: collectionGroup,
+      type: 'socket',
+      url,
+      path,
+      token,
+      userId,
+      eventName,
+      payload,
+      transports: transportMode === 'auto' ? ['polling', 'websocket'] : [transportMode],
+    };
+
+    onSaveCollection(collectionData);
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 w-full items-start">
-      {/* Left Column: Config */}
+    <div className="flex flex-col gap-6 w-full">
+      {/* Save Collection Panel (Added at top) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-bgPanel p-4 border-2 border-borderDark rounded-none shadow-retro-dark">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-bold uppercase text-textMuted">COLLECTION NAME</label>
+          <input
+            type="text"
+            value={collectionName}
+            onChange={(e) => setCollectionName(e.target.value)}
+            placeholder="e.g. Chat Connection"
+            className="p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-bold uppercase text-textMuted">GROUP NAME</label>
+          <input
+            type="text"
+            value={collectionGroup}
+            onChange={(e) => setCollectionGroup(e.target.value)}
+            placeholder="e.g. Realtime API"
+            className="p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
+          />
+        </div>
+        <button
+          onClick={handleSave}
+          className="w-full h-[44px] bg-accentLight text-bgDark hover:bg-textMain transition font-bold rounded-none text-xs uppercase flex items-center justify-center gap-2 shadow-retro"
+        >
+          <Save className="w-4 h-4" />
+          SAVE TO COLLECTION
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 w-full items-start">
+        {/* Left Column: Config */}
       <div className="bg-bgPanel p-5 border-2 border-borderDark rounded-none flex flex-col gap-4 shadow-retro-dark">
         <h2 className="text-sm font-bold uppercase tracking-wider text-textMuted border-b-2 border-borderDark pb-2 flex items-center justify-between">
           <span>&gt; SOCKET.IO CONFIG</span>
@@ -371,5 +431,6 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 };

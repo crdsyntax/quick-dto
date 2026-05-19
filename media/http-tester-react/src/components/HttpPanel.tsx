@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { KeyValuePair, FileData, HttpResponse } from '../types';
-import { Plus, X, Play, RefreshCw } from 'lucide-react';
+import { Plus, X, Play, RefreshCw, Save } from 'lucide-react';
 
 interface HttpPanelProps {
   initialState?: any;
   loadId: number;
-  onSendRequest: (request: any, repeatCount?: number) => void;
+  onSendRequest: (request: any, repeatCount?: number, repeatDelay?: number) => void;
+  onSaveCollection: (collection: any) => void;
   isLoading: boolean;
   response: HttpResponse | null;
   globalToken: string;
@@ -16,6 +17,7 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
   initialState,
   loadId,
   onSendRequest,
+  onSaveCollection,
   isLoading,
   response,
   globalToken,
@@ -33,6 +35,9 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
   const [basicPassword, setBasicPassword] = useState('');
   const [contentType, setContentType] = useState('json');
   const [repeatCount, setRepeatCount] = useState(1);
+  const [repeatDelay, setRepeatDelay] = useState(0);
+  const [collectionName, setCollectionName] = useState('');
+  const [collectionGroup, setCollectionGroup] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<'body' | 'params' | 'headers' | 'files' | 'auth'>('body');
 
   const fileInputRefCounter = useRef(0);
@@ -60,6 +65,8 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
       setAuthToken(initialState.authToken || '');
       setBasicUsername(initialState.basicUsername || '');
       setBasicPassword(initialState.basicPassword || '');
+      setCollectionName(initialState.name || '');
+      setCollectionGroup(initialState.group || '');
 
       if (initialState.queryParams && initialState.queryParams.length > 0) {
         setQueryParams(initialState.queryParams);
@@ -154,7 +161,32 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
       files: collectedFiles,
     };
 
-    onSendRequest(reqData, count > 1 ? count : undefined);
+    onSendRequest(reqData, count > 1 ? count : undefined, count > 1 ? repeatDelay : undefined);
+  };
+
+  const handleSave = () => {
+    if (!collectionName) {
+      alert('POR FAVOR INGRESA UN NOMBRE PARA LA COLECCIÓN');
+      return;
+    }
+
+    const collectionData = {
+      name: collectionName,
+      group: collectionGroup,
+      type: 'http',
+      url,
+      method,
+      body,
+      queryParams: queryParams.filter(p => p.key),
+      headers: headers.filter(h => h.key),
+      authType,
+      authToken,
+      basicUsername,
+      basicPassword,
+      contentType,
+    };
+
+    onSaveCollection(collectionData);
   };
 
   return (
@@ -188,7 +220,7 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
       </div>
 
       {/* Repeat Request & Content Type Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-bgPanel p-4 border-2 border-borderDark rounded-none">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-bgPanel p-4 border-2 border-borderDark rounded-none">
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-bold uppercase text-textMuted">REPEAT COUNT</label>
           <input
@@ -197,6 +229,17 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
             max="1000"
             value={repeatCount}
             onChange={(e) => setRepeatCount(parseInt(e.target.value) || 1)}
+            className="p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-bold uppercase text-textMuted">DELAY (MS)</label>
+          <input
+            type="number"
+            min="0"
+            step="100"
+            value={repeatDelay}
+            onChange={(e) => setRepeatDelay(parseInt(e.target.value) || 0)}
             className="p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
           />
         </div>
@@ -218,6 +261,37 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           REPEAT REQUEST
+        </button>
+      </div>
+
+      {/* Save Collection Panel */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-bgPanel p-4 border-2 border-borderDark rounded-none shadow-retro-dark">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-bold uppercase text-textMuted">COLLECTION NAME</label>
+          <input
+            type="text"
+            value={collectionName}
+            onChange={(e) => setCollectionName(e.target.value)}
+            placeholder="e.g. Get Users List"
+            className="p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-bold uppercase text-textMuted">GROUP NAME</label>
+          <input
+            type="text"
+            value={collectionGroup}
+            onChange={(e) => setCollectionGroup(e.target.value)}
+            placeholder="e.g. User Management"
+            className="p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
+          />
+        </div>
+        <button
+          onClick={handleSave}
+          className="w-full h-[44px] bg-accentLight text-bgDark hover:bg-textMain transition font-bold rounded-none text-xs uppercase flex items-center justify-center gap-2 shadow-retro"
+        >
+          <Save className="w-4 h-4" />
+          SAVE TO COLLECTION
         </button>
       </div>
 

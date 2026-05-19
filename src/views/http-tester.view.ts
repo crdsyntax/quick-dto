@@ -407,10 +407,17 @@ export class HttpTesterPanel {
             });
           } else if (msg.command === "repeatRequest") {
             const repeatCount = msg.repeatCount || 1;
+            const delay = msg.delay || 0;
             const results = [];
+
+            const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
             for (let i = 0; i < repeatCount; i++) {
               try {
+                if (i > 0 && delay > 0) {
+                  await sleep(delay);
+                }
+
                 const result = await this._generator.sendRequest(msg.request);
                 results.push({
                   iteration: i + 1,
@@ -440,6 +447,22 @@ export class HttpTesterPanel {
               totalRequests: repeatCount,
               panelId: this._id,
             });
+          } else if (msg.command === "saveCollection") {
+            const currentCollections = this._loadCollections();
+            const newCollection = msg.collection;
+
+            const existsIndex = currentCollections.findIndex(
+              (c) => c.name === newCollection.name && c.type === newCollection.type
+            );
+
+            if (existsIndex !== -1) {
+              currentCollections[existsIndex] = newCollection;
+            } else {
+              currentCollections.push(newCollection);
+            }
+
+            await HttpTesterPanel.saveCollections(HttpTesterPanel._context, currentCollections);
+            vscode.window.showInformationMessage(`Colección '${newCollection.name}' guardada`);
           } else if (msg.command === "importJson") {
             await this._handleImportJson(msg.type);
           } else if (msg.command === "exportJson") {
