@@ -350,12 +350,14 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
           } else if (msg.command === "exportJson") {
             // Handle JSON export
             await this._handleExportJson(msg.collections);
-          } else if (msg.command === "updateGlobalToken") {
+          } else if (msg.command === "updateGlobalToken" || msg.command === "saveGlobalToken") {
             await this._context.globalState.update(
               "httpTester.globalToken",
               msg.token
             );
-            vscode.window.showInformationMessage("Token Global actualizado");
+            if (msg.command === "updateGlobalToken") {
+              vscode.window.showInformationMessage("Token Global actualizado");
+            }
             // Notificar a todos los paneles abiertos
             const { HttpTesterPanel } = require("./http-tester.view");
             HttpTesterPanel.panels.forEach((panel: any) => {
@@ -364,6 +366,28 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
                 token: msg.token,
               });
             });
+            // Notificar al sidebar también si es necesario (aunque ya lo originó uno de ellos)
+            if (this._view) {
+              this._view.webview.postMessage({
+                command: "loadGlobalToken",
+                token: msg.token,
+              });
+            }
+          } else if (msg.command === "saveGlobalRefreshToken") {
+            await this._context.globalState.update(
+              "httpTester.globalRefreshToken",
+              msg.token
+            );
+            const { HttpTesterPanel } = require("./http-tester.view");
+            HttpTesterPanel.panels.forEach((panel: any) => {
+              panel._panel.webview.postMessage({
+                command: "loadGlobalRefreshToken",
+                token: msg.token,
+              });
+            });
+          } else if (msg.command === "copyToClipboard") {
+            await vscode.env.clipboard.writeText(msg.text);
+            vscode.window.showInformationMessage("Copiado al portapapeles");
           } else if (msg.command === "clearCollections") {
             const isAll = !msg.type;
             const confirmMsg = isAll 

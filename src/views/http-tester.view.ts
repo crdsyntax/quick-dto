@@ -47,6 +47,7 @@ export class HttpTesterPanel {
 
   private _listenedEvents: Set<string> = new Set();
   private _globalToken: string = "";
+  private _isRepeating: boolean = false;
 
   // ID único para cada panel
   private readonly _id: string;
@@ -409,14 +410,19 @@ export class HttpTesterPanel {
             const repeatCount = msg.repeatCount || 1;
             const delay = msg.delay || 0;
             const results = [];
+            this._isRepeating = true;
 
             const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
             for (let i = 0; i < repeatCount; i++) {
+              if (!this._isRepeating) break;
+
               try {
                 if (i > 0 && delay > 0) {
                   await sleep(delay);
                 }
+
+                if (!this._isRepeating) break;
 
                 const result = await this._generator.sendRequest(msg.request);
                 results.push({
@@ -441,12 +447,16 @@ export class HttpTesterPanel {
               }
             }
 
+            this._isRepeating = false;
             webview.postMessage({
               command: "repeatComplete",
               results: results,
               totalRequests: repeatCount,
               panelId: this._id,
             });
+          } else if (msg.command === "stopRepeatedRequests") {
+            this._isRepeating = false;
+            vscode.window.showInformationMessage("Peticiones repetidas detenidas");
           } else if (msg.command === "saveCollection") {
             const currentCollections = this._loadCollections();
             const newCollection = msg.collection;

@@ -1,27 +1,31 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { KeyValuePair, FileData, HttpResponse } from '../types';
-import { Plus, X, Play, RefreshCw, Save } from 'lucide-react';
+import { Plus, X, Play, RefreshCw, Save, Square } from 'lucide-react';
 
 interface HttpPanelProps {
   initialState?: any;
   loadId: number;
   onSendRequest: (request: any, repeatCount?: number, repeatDelay?: number) => void;
-  onSaveCollection: (collection: any) => void;
   isLoading: boolean;
+  isRepeating: boolean;
+  onStopRepeatedRequests: () => void;
   response: HttpResponse | null;
   globalToken: string;
   onStateChange: (state: any) => void;
+  onTokensDetected: (access: string, refresh?: string) => void;
 }
 
 export const HttpPanel: React.FC<HttpPanelProps> = ({
   initialState,
   loadId,
   onSendRequest,
-  onSaveCollection,
   isLoading,
+  isRepeating,
+  onStopRepeatedRequests,
   response,
   globalToken,
   onStateChange,
+  onTokensDetected,
 }) => {
   const [method, setMethod] = useState('GET');
   const [url, setUrl] = useState('');
@@ -36,11 +40,26 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
   const [contentType, setContentType] = useState('json');
   const [repeatCount, setRepeatCount] = useState(1);
   const [repeatDelay, setRepeatDelay] = useState(0);
-  const [collectionName, setCollectionName] = useState('');
-  const [collectionGroup, setCollectionGroup] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<'body' | 'params' | 'headers' | 'files' | 'auth'>('body');
 
   const fileInputRefCounter = useRef(0);
+
+  useEffect(() => {
+    if (response && response.data && typeof response.data === 'object') {
+      const data = response.data as any;
+      const access = data.access_token || data.accessToken || data.token;
+      const refresh = data.refresh_token || data.refreshToken;
+      if (access || refresh) {
+        onTokensDetected(access, refresh);
+      }
+    }
+  }, [response]);
+
+  useEffect(() => {
+    if (globalToken && authType === 'none' && !initialState) {
+      setAuthType('global');
+    }
+  }, [globalToken]);
 
   useEffect(() => {
     onStateChange({
@@ -53,8 +72,9 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
       authToken,
       basicUsername,
       basicPassword,
+      contentType,
     });
-  }, [url, method, body, queryParams, headers, authType, authToken, basicUsername, basicPassword]);
+  }, [url, method, body, queryParams, headers, authType, authToken, basicUsername, basicPassword, contentType]);
 
   useEffect(() => {
     if (initialState) {
@@ -65,8 +85,6 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
       setAuthToken(initialState.authToken || '');
       setBasicUsername(initialState.basicUsername || '');
       setBasicPassword(initialState.basicPassword || '');
-      setCollectionName(initialState.name || '');
-      setCollectionGroup(initialState.group || '');
 
       if (initialState.queryParams && initialState.queryParams.length > 0) {
         setQueryParams(initialState.queryParams);
@@ -164,39 +182,14 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
     onSendRequest(reqData, count > 1 ? count : undefined, count > 1 ? repeatDelay : undefined);
   };
 
-  const handleSave = () => {
-    if (!collectionName) {
-      alert('POR FAVOR INGRESA UN NOMBRE PARA LA COLECCIÓN');
-      return;
-    }
-
-    const collectionData = {
-      name: collectionName,
-      group: collectionGroup,
-      type: 'http',
-      url,
-      method,
-      body,
-      queryParams: queryParams.filter(p => p.key),
-      headers: headers.filter(h => h.key),
-      authType,
-      authToken,
-      basicUsername,
-      basicPassword,
-      contentType,
-    };
-
-    onSaveCollection(collectionData);
-  };
-
   return (
-    <div className="flex flex-col gap-5 w-full">
+    <div className="flex flex-col gap-4 w-full">
       {/* Request Line */}
-      <div className="flex gap-3 items-center">
+      <div className="flex gap-2 items-center">
         <select
           value={method}
           onChange={(e) => setMethod(e.target.value)}
-          className="w-32 p-3 bg-bgDark border-2 border-borderDark text-textMain font-bold uppercase rounded-none text-sm focus:border-accentLight focus:outline-none"
+          className="w-28 p-2.5 bg-bgDark border-2 border-borderDark text-textMain font-bold uppercase rounded-none text-xs focus:border-accentLight focus:outline-none"
         >
           {['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'].map((m) => (
             <option key={m} value={m}>{m}</option>
@@ -207,92 +200,74 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://api.example.com/v1/resource"
-          className="flex-grow p-3 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none placeholder-textMuted"
+          className="flex-grow p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none placeholder-textMuted"
         />
         <button
           onClick={() => handleSend(1)}
-          disabled={isLoading}
-          className="px-6 h-[48px] bg-textMain text-bgDark hover:bg-accentLight disabled:bg-borderDark disabled:text-textMuted transition font-bold rounded-none text-xs uppercase flex items-center gap-2 shadow-retro"
+          disabled={isLoading || isRepeating}
+          className="px-5 h-[42px] bg-bgDark border-2 border-textMain text-textMain hover:bg-textMain hover:text-bgDark disabled:opacity-50 transition font-bold rounded-none text-[10px] uppercase flex items-center gap-2"
         >
-          <Play className="w-3.5 h-3.5 fill-current" />
+          <Play className="w-3 h-3 fill-current" />
           SEND
         </button>
       </div>
 
       {/* Repeat Request & Content Type Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-bgPanel p-4 border-2 border-borderDark rounded-none">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold uppercase text-textMuted">REPEAT COUNT</label>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end bg-bgPanel/20 backdrop-blur-md p-3.5 border-2 border-borderDark rounded-none">
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-bold uppercase text-textMuted">REPEAT COUNT</label>
           <input
             type="number"
             min="1"
             max="1000"
             value={repeatCount}
             onChange={(e) => setRepeatCount(parseInt(e.target.value) || 1)}
-            className="p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
+            disabled={isRepeating}
+            className="p-2 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none disabled:opacity-50"
           />
         </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold uppercase text-textMuted">DELAY (MS)</label>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-bold uppercase text-textMuted">DELAY (MS)</label>
           <input
             type="number"
             min="0"
             step="100"
             value={repeatDelay}
             onChange={(e) => setRepeatDelay(parseInt(e.target.value) || 0)}
-            className="p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
+            disabled={isRepeating}
+            className="p-2 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none disabled:opacity-50"
           />
         </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold uppercase text-textMuted">CONTENT TYPE</label>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] font-bold uppercase text-textMuted">CONTENT TYPE</label>
           <select
             value={contentType}
             onChange={(e) => setContentType(e.target.value)}
-            className="p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none uppercase"
+            disabled={isRepeating}
+            className="p-2 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none uppercase disabled:opacity-50"
           >
             <option value="json">JSON</option>
             <option value="formdata">FormData</option>
           </select>
         </div>
-        <button
-          onClick={() => handleSend(repeatCount)}
-          disabled={isLoading}
-          className="w-full h-[44px] bg-bgDark border-2 border-borderDark hover:border-textMain text-textMain transition font-bold rounded-none text-xs uppercase flex items-center justify-center gap-2"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          REPEAT REQUEST
-        </button>
-      </div>
-
-      {/* Save Collection Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-bgPanel p-4 border-2 border-borderDark rounded-none shadow-retro-dark">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold uppercase text-textMuted">COLLECTION NAME</label>
-          <input
-            type="text"
-            value={collectionName}
-            onChange={(e) => setCollectionName(e.target.value)}
-            placeholder="e.g. Get Users List"
-            className="p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold uppercase text-textMuted">GROUP NAME</label>
-          <input
-            type="text"
-            value={collectionGroup}
-            onChange={(e) => setCollectionGroup(e.target.value)}
-            placeholder="e.g. User Management"
-            className="p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
-          />
-        </div>
-        <button
-          onClick={handleSave}
-          className="w-full h-[44px] bg-accentLight text-bgDark hover:bg-textMain transition font-bold rounded-none text-xs uppercase flex items-center justify-center gap-2 shadow-retro"
-        >
-          <Save className="w-4 h-4" />
-          SAVE TO COLLECTION
-        </button>
+        {isRepeating ? (
+          <button
+            onClick={onStopRepeatedRequests}
+            className="w-full h-[38px] bg-textMain text-bgDark hover:bg-accentLight transition font-bold rounded-none text-[10px] uppercase flex items-center justify-center gap-2 shadow-retro"
+          >
+            <Square className="w-3 h-3 fill-current" />
+            STOP REQUESTS
+          </button>
+        ) : (
+          <button
+            onClick={() => handleSend(repeatCount)}
+            disabled={isLoading}
+            className="w-full h-[38px] bg-bgDark border-2 border-borderDark hover:border-textMain text-textMain transition font-bold rounded-none text-[10px] uppercase flex items-center justify-center gap-2"
+          >
+            <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
+            REPEAT REQUEST
+          </button>
+        )}
       </div>
 
       {/* Sub tabs header */}
@@ -301,9 +276,9 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
           <button
             key={tab}
             onClick={() => setActiveSubTab(tab)}
-            className={`px-5 py-2.5 text-xs font-bold uppercase transition-all border-b-4 tracking-wider ${
+            className={`px-4 py-2 text-[10px] font-bold uppercase transition-all border-b-2 tracking-wider ${
               activeSubTab === tab
-                ? 'border-textMain text-accentLight bg-bgPanel'
+                ? 'border-textMain text-accentLight bg-bgPanel/20 backdrop-blur-md'
                 : 'border-transparent text-textMuted hover:text-textMain'
             }`}
           >
@@ -313,7 +288,7 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
       </div>
 
       {/* Sub tabs content */}
-      <div className="bg-bgPanel border-2 border-borderDark rounded-none p-5 min-h-[160px]">
+      <div className="bg-bgPanel/20 backdrop-blur-md border-2 border-borderDark rounded-none p-5 min-h-[160px]">
         {/* Body tab */}
         {activeSubTab === 'body' && (
           <textarea
@@ -354,17 +329,17 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
             ))}
             <button
               onClick={addQueryParam}
-              className="self-start mt-2 px-3 py-1.5 bg-bgDark border-2 border-borderDark text-textMain hover:border-textMain transition font-bold rounded-none text-xs uppercase flex items-center gap-1"
+              className="self-start mt-2 px-2.5 py-1 bg-bgDark border-2 border-borderDark text-textMain hover:border-textMain transition font-bold rounded-none text-[9px] uppercase flex items-center gap-1"
             >
-              <Plus className="w-3.5 h-3.5" /> ADD PARAM
+              <Plus className="w-3 h-3" /> ADD PARAM
             </button>
           </div>
         )}
 
         {/* Headers tab */}
         {activeSubTab === 'headers' && (
-          <div className="flex flex-col gap-3">
-            <h4 className="text-xs font-bold text-textMuted uppercase">HEADERS</h4>
+          <div className="flex flex-col gap-2.5">
+            <h4 className="text-[10px] font-bold text-textMuted uppercase">HEADERS</h4>
             {headers.map((header, index) => (
               <div key={index} className="flex gap-2 items-center">
                 <input
@@ -372,36 +347,36 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
                   value={header.key}
                   onChange={(e) => updateHeader(index, 'key', e.target.value)}
                   placeholder="HEADER NAME"
-                  className="flex-1 p-2 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
+                  className="flex-1 p-1.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none"
                 />
                 <input
                   type="text"
                   value={header.value}
                   onChange={(e) => updateHeader(index, 'value', e.target.value)}
                   placeholder="VALUE"
-                  className="flex-1 p-2 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
+                  className="flex-1 p-1.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none"
                 />
                 <button
                   onClick={() => removeHeader(index)}
-                  className="p-2 text-textMuted hover:text-accentLight transition"
+                  className="p-1.5 text-textMuted hover:text-accentLight transition"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             ))}
             <button
               onClick={addHeader}
-              className="self-start mt-2 px-3 py-1.5 bg-bgDark border-2 border-borderDark text-textMain hover:border-textMain transition font-bold rounded-none text-xs uppercase flex items-center gap-1"
+              className="self-start mt-2 px-2.5 py-1 bg-bgDark border-2 border-borderDark text-textMain hover:border-textMain transition font-bold rounded-none text-[9px] uppercase flex items-center gap-1"
             >
-              <Plus className="w-3.5 h-3.5" /> ADD HEADER
+              <Plus className="w-3 h-3" /> ADD HEADER
             </button>
           </div>
         )}
 
         {/* Files tab */}
         {activeSubTab === 'files' && (
-          <div className="flex flex-col gap-3">
-            <h4 className="text-xs font-bold text-textMuted uppercase">FILES (FORMDATA)</h4>
+          <div className="flex flex-col gap-2.5">
+            <h4 className="text-[10px] font-bold text-textMuted uppercase">FILES (FORMDATA)</h4>
             {files.map((file, index) => (
               <div key={index} className="flex gap-2 items-center">
                 <input
@@ -409,26 +384,26 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
                   value={file.fieldName}
                   onChange={(e) => updateFileRow(index, e.target.value)}
                   placeholder="FIELD NAME"
-                  className="flex-1 p-2 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
+                  className="flex-1 p-1.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none"
                 />
                 <input
                   type="file"
                   onChange={(e) => handleFileChange(index, e)}
-                  className="flex-1 p-1 bg-bgDark border-2 border-borderDark text-textMuted rounded-none text-xs focus:border-accentLight focus:outline-none"
+                  className="flex-1 p-1 bg-bgDark border-2 border-borderDark text-textMuted rounded-none text-[10px] focus:border-accentLight focus:outline-none"
                 />
                 <button
                   onClick={() => removeFileRow(index)}
-                  className="p-2 text-textMuted hover:text-accentLight transition"
+                  className="p-1.5 text-textMuted hover:text-accentLight transition"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             ))}
             <button
               onClick={addFileRow}
-              className="self-start mt-2 px-3 py-1.5 bg-bgDark border-2 border-borderDark text-textMain hover:border-textMain transition font-bold rounded-none text-xs uppercase flex items-center gap-1"
+              className="self-start mt-2 px-2.5 py-1 bg-bgDark border-2 border-borderDark text-textMain hover:border-textMain transition font-bold rounded-none text-[9px] uppercase flex items-center gap-1"
             >
-              <Plus className="w-3.5 h-3.5" /> ADD FILE
+              <Plus className="w-3 h-3" /> ADD FILE
             </button>
           </div>
         )}
@@ -508,24 +483,26 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
 
       {/* Response Panel */}
       {response && (
-        <div className="bg-bgDark border-2 border-borderDark rounded-none mt-4 overflow-hidden shadow-retro-dark">
-          {/* Header */}
-          <div className="flex justify-between items-center bg-bgPanel px-5 py-3 border-b-2 border-borderDark text-xs font-bold text-textMuted uppercase">
-            <span className={`px-2 py-1 ${response.status >= 400 ? 'bg-textMain text-bgDark' : 'bg-transparent text-accentLight border-2 border-textMain'}`}>
-              HTTP {response.status} {response.statusText}
-            </span>
-            <div className="flex gap-4">
-              <span>TIME: <strong className="text-textMain">{response.time}ms</strong></span>
-              <span>SIZE: <strong className="text-textMain">{(response.size / 1024).toFixed(2)}KB</strong></span>
+        <div className="relative bg-bgDark/20 backdrop-blur-md border-2 border-borderDark rounded-none mt-4 overflow-hidden shadow-retro-dark min-h-[200px]">
+          <div className="relative z-10">
+            {/* Header */}
+            <div className="flex justify-between items-center bg-bgPanel/10 px-5 py-3 border-b-2 border-borderDark text-xs font-bold text-textMuted uppercase">
+              <span className={`px-2 py-1 ${response.status >= 400 ? 'bg-textMain text-bgDark' : 'bg-transparent text-accentLight border-2 border-textMain'}`}>
+                HTTP {response.status} {response.statusText}
+              </span>
+              <div className="flex gap-4">
+                <span>TIME: <strong className="text-textMain">{response.time}ms</strong></span>
+                <span>SIZE: <strong className="text-textMain">{(response.size / 1024).toFixed(2)}KB</strong></span>
+              </div>
             </div>
-          </div>
-          {/* Data content */}
-          <div className="p-5 overflow-auto max-h-[400px]">
-            <pre className="text-xs text-textMain whitespace-pre-wrap leading-relaxed">
-              {typeof response.data === 'object'
-                ? JSON.stringify(response.data, null, 2)
-                : response.data}
-            </pre>
+            {/* Data content */}
+            <div className="p-5 overflow-auto max-h-[400px]">
+              <pre className="text-xs text-textMain whitespace-pre-wrap leading-relaxed">
+                {typeof response.data === 'object'
+                  ? JSON.stringify(response.data, null, 2)
+                  : response.data}
+              </pre>
+            </div>
           </div>
         </div>
       )}

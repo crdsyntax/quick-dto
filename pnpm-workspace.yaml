@@ -1,0 +1,4 @@
+allowBuilds:
+  esbuild: false
+  keytar: false
+  puppeteer: false

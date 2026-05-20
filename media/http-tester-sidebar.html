@@ -295,8 +295,11 @@
       <div class="section-title">Global Auth (Bearer)</div>
       <div style="margin-bottom: 8px; display: flex; gap: 4px;">
         <input type="password" id="global-token" placeholder="Token Global">
-        <button class="button primary" id="save-global-token" style="width: auto; margin-bottom: 0; padding: 4px 8px;">
+        <button class="button primary" id="save-global-token" style="width: auto; margin-bottom: 0; padding: 4px 8px;" title="Guardar">
           💾
+        </button>
+        <button class="button secondary" id="copy-global-token" style="width: auto; margin-bottom: 0; padding: 4px 8px;" title="Copiar">
+          📋
         </button>
       </div>
     </div>
@@ -327,6 +330,7 @@
       const socketCollectionsContainer = document.getElementById("socket-collections-container");
       const globalTokenInput = document.getElementById("global-token");
       const saveGlobalTokenButton = document.getElementById("save-global-token");
+      const copyGlobalTokenButton = document.getElementById("copy-global-token");
       
       const newCollectionName = document.getElementById("new-collection-name");
       const newCollectionGroup = document.getElementById("new-collection-group");
@@ -388,6 +392,19 @@
         vscode.postMessage({
           command: "updateGlobalToken",
           token: globalTokenInput.value
+        });
+      });
+
+      // Copy Global Token
+      copyGlobalTokenButton.addEventListener("click", () => {
+        const token = globalTokenInput.value;
+        if (!token) {
+          alert("No hay token para copiar");
+          return;
+        }
+        vscode.postMessage({
+          command: "copyToClipboard",
+          text: token
         });
       });
 

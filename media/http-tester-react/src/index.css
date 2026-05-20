@@ -25,6 +25,24 @@ body {
   font-family: 'Courier New', Courier, monospace;
 }
 
+/* Lógica analítica para el cambio de estado mediante una sola propiedad */
+body[data-status="error"] {
+  --pc-color: #dc2626; /* text-red-600 */
+  --shadow-color: rgba(220, 38, 38, 0.3);
+}
+
+body:not([data-status="error"]) {
+  --pc-color: #10b981; /* text-emerald-500 */
+  --shadow-color: rgba(16, 185, 129, 0.3);
+}
+
+/* Aplicación de bordes e iluminación retro estricta */
+.retro-pc-border {
+  border-color: var(--pc-color) !important;
+  color: var(--pc-color) !important;
+  box-shadow: 0 0 20px var(--shadow-color) !important;
+}
+
 /* Base input styles for retro */
 input, textarea, select {
   font-family: 'Courier New', Courier, monospace;
