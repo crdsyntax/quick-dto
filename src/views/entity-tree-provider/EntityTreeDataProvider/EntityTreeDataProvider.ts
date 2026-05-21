@@ -309,17 +309,26 @@ export class EntityTreeDataProvider implements vscode.TreeDataProvider<TreeEleme
   private parsePrismaRelations(content: string): EntityRelation[] {
     const relations: EntityRelation[] = [];
     const scalarTypes = ["String", "Boolean", "Int", "BigInt", "Float", "Decimal", "DateTime", "Json", "Bytes", "Unsupported"];
+    const keywords = ["datasource", "generator", "model", "enum", "type"];
     
     // Match fields: name Type or name Type[]
-    const fieldRegex = /^\s*(\w+)\s+(\w+)(\[\])?/gm;
-    let match: RegExpExecArray | null;
-    
-    while ((match = fieldRegex.exec(content)) !== null) {
-      const propertyName = match[1];
-      const targetEntity = match[2];
-      const isArray = !!match[3];
+    // We avoid matching lines starting with keywords
+    const lines = content.split("\n");
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("@@")) continue;
+      
+      const fieldParts = trimmed.split(/\s+/);
+      if (fieldParts.length < 2) continue;
+      
+      const propertyName = fieldParts[0];
+      if (keywords.includes(propertyName.toLowerCase())) continue;
+      
+      const typePart = fieldParts[1];
+      const targetEntity = typePart.replace("[]", "").replace("?", "");
+      const isArray = typePart.includes("[]");
 
-      if (!scalarTypes.includes(targetEntity) && targetEntity !== "model") {
+      if (!scalarTypes.includes(targetEntity)) {
         relations.push({
           type: isArray ? "OneToMany" : "ManyToOne",
           targetEntity,

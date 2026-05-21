@@ -107,22 +107,25 @@ export function parsePrismaSchema(schemaContent: string): Record<string, EntityD
 export function findPrismaSchema(rootPath: string): string | string[] | null {
   const checkPath = (base: string): string | string[] | null => {
     const multiFileSchemaDir = path.join(base, "prisma", "schema");
+    const mainSchemaFile = path.join(base, "prisma", "schema.prisma");
+    const rootSchemaFile = path.join(base, "schema.prisma");
+
     if (fs.existsSync(multiFileSchemaDir) && fs.lstatSync(multiFileSchemaDir).isDirectory()) {
       const files = fs.readdirSync(multiFileSchemaDir)
         .filter(f => f.endsWith(".prisma"))
         .map(f => path.join(multiFileSchemaDir, f));
+      
+      if (fs.existsSync(mainSchemaFile)) {
+        files.unshift(mainSchemaFile);
+      }
       return files.length > 0 ? files : null;
     }
 
-    const commonPaths = [
-      path.join(base, "prisma", "schema.prisma"),
-      path.join(base, "schema.prisma"),
-    ];
-
-    for (const p of commonPaths) {
-      if (fs.existsSync(p)) {
-        return p;
-      }
+    if (fs.existsSync(mainSchemaFile)) {
+      return mainSchemaFile;
+    }
+    if (fs.existsSync(rootSchemaFile)) {
+      return rootSchemaFile;
     }
     return null;
   };

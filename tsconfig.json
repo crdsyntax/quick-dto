@@ -13,7 +13,11 @@
     "moduleResolution": "node",
     "skipLibCheck": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "types": [
+      "node",
+      "vscode"
+    ]
   },
   "exclude": [
     "node_modules",
