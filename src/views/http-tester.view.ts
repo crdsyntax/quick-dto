@@ -724,7 +724,7 @@ export class HttpTesterPanel {
 
     // Refresh Sidebar
     try {
-      const { HttpTesterSidebarProvider } = require("./http-tester-sidebar.view");
+      const { HttpTesterSidebarProvider } = require("./http-tester-sidebar");
       if (HttpTesterSidebarProvider.instance) {
         HttpTesterSidebarProvider.instance.refreshCollections();
       }

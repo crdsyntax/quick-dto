@@ -1,3 +1,5 @@
+import { AuthType, SocketLogType, SocketStatusClass } from './enums';
+
 export interface KeyValuePair {
   key: string;
   value: string;
@@ -15,7 +17,7 @@ export interface HttpRequest {
   headers: Record<string, string>;
   queryParams: Record<string, string | string[]>;
   body: any;
-  authType: string;
+  authType: AuthType;
   authToken?: string;
   basicUsername?: string;
   basicPassword?: string;
@@ -63,4 +65,40 @@ export interface HttpResponse {
   time: number;
   size: number;
   data: any;
+}
+
+export interface SocketLog {
+  time: string;
+  message: string;
+  type: SocketLogType;
+  eventName?: string;
+}
+
+export interface SocketStatus {
+  text: string;
+  className: SocketStatusClass;
+}
+
+export interface RepeatProgress {
+  current: number;
+  total: number;
+}
+
+export interface VSCodeState {
+  collections?: Collection[];
+  url?: string;
+  method?: string;
+  body?: string;
+  queryParams?: KeyValuePair[];
+  headers?: KeyValuePair[];
+  authType?: AuthType;
+  authToken?: string;
+  basicUsername?: string;
+  basicPassword?: string;
+  [key: string]: any;
+}
+
+export interface SocketStatus {
+  text: string;
+  className: SocketStatusClass;
 }

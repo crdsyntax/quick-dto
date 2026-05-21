@@ -1,4 +1,7 @@
+packages:
+  - "."
+  - "media/http-tester-react"
+  - "media/erd-visualizer-react"
+  - "media/flowchart-editor-react"
 allowBuilds:
-  esbuild: false
-  keytar: false
-  puppeteer: false
+  esbuild: true

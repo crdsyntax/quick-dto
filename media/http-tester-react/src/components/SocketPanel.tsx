@@ -1,18 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { SocketRequest } from '../types';
-import { Power, Send, Radio, Terminal, Trash2 } from 'lucide-react';
-
-interface SocketLog {
-  time: string;
-  message: string;
-  type: 'event' | 'error' | 'info';
-  eventName?: string;
-}
+import { SocketRequest, SocketLog, SocketStatus } from '../types';
+import { SocketStatusClass } from '../enums';
+import { Power, Send, Radio, Terminal, Trash2, Download } from 'lucide-react';
 
 interface SocketPanelProps {
   initialState?: any;
   loadId: number;
-  socketStatus: { text: string; className: string };
+  socketStatus: SocketStatus;
   onConnect: (config: SocketRequest) => void;
   onDisconnect: () => void;
   onEmit: (eventName: string, payload: string) => void;
@@ -22,6 +16,7 @@ interface SocketPanelProps {
   onClearConnectionLogs: () => void;
   onClearListenLogs: () => void;
   onStateChange: (state: any) => void;
+  onExportJson?: () => void;
 }
 
 export const SocketPanel: React.FC<SocketPanelProps> = ({
@@ -37,6 +32,7 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
   onClearConnectionLogs,
   onClearListenLogs,
   onStateChange,
+  onExportJson,
 }) => {
   const [url, setUrl] = useState('http://localhost:3000');
   const [path, setPath] = useState('/socket.io');
@@ -48,7 +44,7 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
   const [listenEventName, setListenEventName] = useState('message');
   const [activeTab, setActiveTab] = useState<'emit' | 'listen' | 'logs'>('emit');
 
-  const isConnected = socketStatus.className === 'connected';
+  const isConnected = socketStatus.className === SocketStatusClass.CONNECTED;
 
   // Sync state upward
   useEffect(() => {
@@ -335,15 +331,27 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
             {/* Tab: Logs */}
             {activeTab === 'logs' && (
               <div className="flex flex-col gap-3.5 flex-grow">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center gap-2">
                   <h3 className="text-[10px] font-bold uppercase text-textMuted">CONNECTION LOGS</h3>
-                  <button
-                    onClick={onClearConnectionLogs}
-                    disabled={connectionLogs.length === 0}
-                    className="py-1 px-2.5 bg-bgPanel/40 border-2 border-borderDark hover:border-textMain disabled:opacity-40 text-textMain transition font-bold rounded-none text-[9px] uppercase flex items-center gap-1"
-                  >
-                    <Trash2 className="w-3 h-3" /> LIMPIAR
-                  </button>
+                  <div className="flex gap-2">
+                    {onExportJson && (
+                      <button
+                        type="button"
+                        onClick={onExportJson}
+                        disabled={connectionLogs.length === 0 && listenLogs.length === 0}
+                        className="py-1 px-2.5 bg-bgPanel/40 border-2 border-borderDark hover:border-textMain disabled:opacity-40 text-textMain transition font-bold rounded-none text-[9px] uppercase flex items-center gap-1"
+                      >
+                        <Download className="w-3 h-3" /> EXPORT JSON
+                      </button>
+                    )}
+                    <button
+                      onClick={onClearConnectionLogs}
+                      disabled={connectionLogs.length === 0}
+                      className="py-1 px-2.5 bg-bgPanel/40 border-2 border-borderDark hover:border-textMain disabled:opacity-40 text-textMain transition font-bold rounded-none text-[9px] uppercase flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" /> LIMPIAR
+                    </button>
+                  </div>
                 </div>
 
                 {/* Logs area */}

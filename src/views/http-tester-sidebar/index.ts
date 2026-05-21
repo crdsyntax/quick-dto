@@ -4,15 +4,28 @@ import { io, Socket } from "socket.io-client";
 import {
   HttpCollection,
   HttpTesterGenerator,
-} from "../generators/http-tester.generator";
-
-interface SocketTesterState {
-  url: string;
-  token: string;
-  userId: string;
-  eventName: string;
-  payload: string;
-}
+} from "../../generators/http-tester.generator";
+import { loadSidebarHtml } from "./helpers/webview.helpers";
+import {
+  buildSocketClientOptions,
+  parseSocketPayload,
+} from "./helpers/socket.helpers";
+import {
+  filterCollectionsByType,
+  isValidHttpCollection,
+  mergeCollections,
+  normalizeCollections,
+} from "./helpers/collection.helpers";
+import {
+  detectSwaggerUrls,
+  loadOpenApiJson,
+  resolveOpenApiBaseUrl,
+} from "./helpers/swagger.helpers";
+import {
+  SocketStatus,
+  SocketTesterState,
+  WebviewMessage,
+} from "./types";
 
 export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewId = "httpTesterView";
@@ -50,7 +63,7 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
     context: vscode.WebviewViewResolveContext,
-    _token: vscode.CancellationToken
+    _token: vscode.CancellationToken,
   ) {
     this._view = webviewView;
 
@@ -76,13 +89,16 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
   private _loadGlobalCollections(): HttpCollection[] {
     return this._context.globalState.get<HttpCollection[]>(
       "httpTester.collections",
-      []
+      [],
     );
   }
 
   private _sendGlobalToken() {
     if (this._view) {
-      const token = this._context.globalState.get<string>("httpTester.globalToken", "");
+      const token = this._context.globalState.get<string>(
+        "httpTester.globalToken",
+        "",
+      );
       this._view.webview.postMessage({
         command: "loadGlobalToken",
         token: token,
@@ -100,27 +116,14 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
   }
 
   private _getHtmlForWebview(webview: vscode.Webview): string {
-    const htmlPath = vscode.Uri.joinPath(
-      this._extensionUri,
-      "media",
-      "http-tester-sidebar.html"
-    );
-    let html = fs.readFileSync(htmlPath.fsPath, "utf8");
-
-    const rootUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, "media")
-    );
-
-    html = html.replace(/{{root}}/g, rootUri.toString());
-
-    return html;
+    return loadSidebarHtml(this._extensionUri, webview);
   }
 
   // --- Socket.IO Helper Methods ---
 
   private _postSocketLog(
     message: string,
-    type: "info" | "error" | "event" = "info"
+    type: "info" | "error" | "event" = "info",
   ) {
     if (this._view) {
       this._view.webview.postMessage({ command: "socketLog", message, type });
@@ -130,7 +133,7 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
 
   private _updateSocketStatus(
     status: "Connected" | "Connecting" | "Disconnected",
-    className: string
+    className: string,
   ) {
     this._lastSocketStatus = { text: status, class: className };
     if (this._view) {
@@ -150,11 +153,7 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
 
     this._updateSocketStatus("Connecting", "connecting");
 
-    this.socket = io(state.url, {
-      transports: ["websocket", "polling"],
-      auth: state.token ? { token: `Bearer ${state.token}` } : undefined,
-      query: state.userId ? { userId: state.userId } : undefined,
-    });
+    this.socket = io(state.url, buildSocketClientOptions(state));
 
     this.socket.on("connect", () => {
       this._updateSocketStatus("Connected", "connected");
@@ -167,7 +166,7 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
       this.socket?.onAny((event, ...args) => {
         this._postSocketLog(
           `Event: ${event}\nPayload: ${JSON.stringify(args, null, 2)}`,
-          "event"
+          "event",
         );
       });
     });
@@ -206,24 +205,17 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      let payloadObject;
-      const trimmedPayload = data.payload.trim();
-
-      if (trimmedPayload) {
-        payloadObject = JSON.parse(trimmedPayload);
-      } else {
-        payloadObject = {};
-      }
+      const payloadObject = parseSocketPayload(data.payload);
 
       this.socket.emit(data.eventName, payloadObject);
       this._postSocketLog(
         `Emitted: ${data.eventName}\nPayload: ${data.payload}`,
-        "info"
+        "info",
       );
     } catch (err: any) {
       this._postSocketLog(
         `Payload Error: Invalid JSON - ${err.message}`,
-        "error"
+        "error",
       );
       if (this._view) {
         this._view.webview.postMessage({
@@ -234,11 +226,15 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private _handleSocketMessage(msg: any) {
-    const { command, data } = msg;
+  private _handleSocketMessage(msg: WebviewMessage) {
+    const { command } = msg;
+    const data = (msg as { data?: unknown }).data;
 
-    if (data && command === "socketStateUpdate") {
-      this._socketState = { ...this._socketState, ...data };
+    if (data && command === "socketStateUpdate" && typeof data === "object") {
+      this._socketState = {
+        ...this._socketState,
+        ...(data as Partial<SocketTesterState>),
+      };
     }
 
     switch (command) {
@@ -248,9 +244,17 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
       case "socketDisconnect":
         this._disconnectSocket();
         break;
-      case "socketEmit":
-        this._emitEvent(data);
+      case "socketEmit": {
+        if (
+          data &&
+          typeof data === "object" &&
+          typeof (data as { eventName?: unknown }).eventName === "string" &&
+          typeof (data as { payload?: unknown }).payload === "string"
+        ) {
+          this._emitEvent(data as { eventName: string; payload: string });
+        }
         break;
+      }
       case "socketGetInitialState":
         if (this._view) {
           this._view.webview.postMessage({
@@ -267,14 +271,14 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
 
   private _setWebviewMessageListener(webview: vscode.Webview) {
     webview.onDidReceiveMessage(
-      async (msg) => {
+      async (msg: WebviewMessage) => {
         try {
           if (msg.command === "sendRequest") {
             // Abrir el HTTP Tester Panel en el editor
             const { HttpTesterPanel } = require("./http-tester.view");
             const panel = HttpTesterPanel.createOrShow(
               this._extensionUri,
-              this._context
+              this._context,
             );
 
             // Enviar la petición al panel del editor
@@ -289,7 +293,7 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
             const { HttpTesterPanel } = require("./http-tester.view");
             const panel = HttpTesterPanel.createOrShow(
               this._extensionUri,
-              this._context
+              this._context,
             );
 
             // Cargar la colección en el panel del editor
@@ -302,29 +306,28 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
             }, 1000);
           } else if (msg.command === "saveCollection") {
             const currentCollections = this._loadGlobalCollections();
-            const newCollection = msg.collection;
-
-            // Evitar duplicados por nombre y tipo
-            const existsIndex = currentCollections.findIndex(
-              (c) => c.name === newCollection.name && c.type === newCollection.type
-            );
-
-            if (existsIndex !== -1) {
-              currentCollections[existsIndex] = newCollection;
-            } else {
-              currentCollections.push(newCollection);
-            }
+            const newCollection = msg.collection as HttpCollection;
+            const updatedCollections = mergeCollections(currentCollections, [
+              newCollection,
+            ]);
 
             const { HttpTesterPanel } = require("./http-tester.view");
-            await HttpTesterPanel.saveCollections(this._context, currentCollections);
-            vscode.window.showInformationMessage(`Colección '${newCollection.name}' guardada`);
-          } else if (msg.command === "importSwagger") {
+            await HttpTesterPanel.saveCollections(
+              this._context,
+              updatedCollections,
+            );
+            vscode.window.showInformationMessage(
+              `Colección '${newCollection.name}' guardada`,
+            );
+          } else if (msg.command === "importSwagger" && typeof msg.url === "string") {
             await this._handleImportSwagger(msg.url);
           } else if (msg.command === "detectSwagger") {
-            const urls = await this._detectSwaggerUrls();
+            const urls = await detectSwaggerUrls(
+              vscode.workspace.workspaceFolders,
+            );
             if (urls.length === 0) {
               vscode.window.showWarningMessage(
-                "No se detectaron URLs de Swagger automáticamente. Intenta ingresar una manualmente."
+                "No se detectaron URLs de Swagger automáticamente. Intenta ingresar una manualmente.",
               );
               webview.postMessage({
                 command: "stopLoading",
@@ -340,25 +343,31 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
             if (selectedUrl) {
               await this._handleImportSwagger(selectedUrl);
             }
-            
+
             webview.postMessage({
               command: "stopLoading",
             });
-          } else if (msg.command === "importJson") {
-            // Handle JSON import
+          } else if (
+            msg.command === "importJson" &&
+            (msg.type === "http" || msg.type === "socket")
+          ) {
             await this._handleImportJson(msg.type);
-          } else if (msg.command === "exportJson") {
-            // Handle JSON export
-            await this._handleExportJson(msg.collections);
-          } else if (msg.command === "updateGlobalToken" || msg.command === "saveGlobalToken") {
+          } else if (
+            msg.command === "exportJson" &&
+            Array.isArray(msg.collections)
+          ) {
+            await this._handleExportJson(msg.collections as HttpCollection[]);
+          } else if (
+            msg.command === "updateGlobalToken" ||
+            msg.command === "saveGlobalToken"
+          ) {
             await this._context.globalState.update(
               "httpTester.globalToken",
-              msg.token
+              msg.token as string,
             );
             if (msg.command === "updateGlobalToken") {
               vscode.window.showInformationMessage("Token Global actualizado");
             }
-            // Notificar a todos los paneles abiertos
             const { HttpTesterPanel } = require("./http-tester.view");
             HttpTesterPanel.panels.forEach((panel: any) => {
               panel._panel.webview.postMessage({
@@ -366,7 +375,6 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
                 token: msg.token,
               });
             });
-            // Notificar al sidebar también si es necesario (aunque ya lo originó uno de ellos)
             if (this._view) {
               this._view.webview.postMessage({
                 command: "loadGlobalToken",
@@ -376,7 +384,7 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
           } else if (msg.command === "saveGlobalRefreshToken") {
             await this._context.globalState.update(
               "httpTester.globalRefreshToken",
-              msg.token
+              msg.token as string,
             );
             const { HttpTesterPanel } = require("./http-tester.view");
             HttpTesterPanel.panels.forEach((panel: any) => {
@@ -385,52 +393,69 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
                 token: msg.token,
               });
             });
-          } else if (msg.command === "copyToClipboard") {
+          } else if (msg.command === "copyToClipboard" && typeof msg.text === "string") {
             await vscode.env.clipboard.writeText(msg.text);
             vscode.window.showInformationMessage("Copiado al portapapeles");
           } else if (msg.command === "clearCollections") {
             const isAll = !msg.type;
+            const filterType = typeof msg.type === "string" ? msg.type : undefined;
             const confirmMsg = isAll 
               ? "¿Estás seguro de que deseas eliminar TODAS las colecciones? Esta acción no se puede deshacer."
-              : `¿Estás seguro de que deseas eliminar TODAS las colecciones de tipo ${msg.type.toUpperCase()}? Esta acción no se puede deshacer.`;
+              : `¿Estás seguro de que deseas eliminar TODAS las colecciones de tipo ${
+                  filterType?.toUpperCase() ?? "?"
+                }? Esta acción no se puede deshacer.`;
 
             const confirmVal = await vscode.window.showWarningMessage(
               confirmMsg,
               { modal: true },
-              "Eliminar Todo"
+              "Eliminar Todo",
             );
             if (confirmVal === "Eliminar Todo") {
               const currentCollections = this._loadGlobalCollections();
-              const updatedCollections = isAll 
-                ? [] 
-                : currentCollections.filter((c) => c.type !== msg.type);
+              const updatedCollections = isAll
+                ? []
+                : currentCollections.filter((c) => c.type !== filterType);
               const { HttpTesterPanel } = require("./http-tester.view");
-              await HttpTesterPanel.saveCollections(this._context, updatedCollections);
+              await HttpTesterPanel.saveCollections(
+                this._context,
+                updatedCollections,
+              );
               vscode.window.showInformationMessage(
-                isAll ? "Todas las colecciones han sido eliminadas" : `Colecciones de tipo ${msg.type.toUpperCase()} eliminadas`
+                isAll
+                  ? "Todas las colecciones han sido eliminadas"
+                  : `Colecciones de tipo ${filterType?.toUpperCase() ?? "?"} eliminadas`,
               );
             }
-          } else if (msg.command === "deleteCollection") {
+          } else if (
+            msg.command === "deleteCollection" &&
+            typeof msg.name === "string" &&
+            typeof msg.type === "string"
+          ) {
             const confirmVal = await vscode.window.showWarningMessage(
               `¿Estás seguro de que deseas eliminar la colección '${msg.name}' (${msg.type.toUpperCase()})?`,
               { modal: true },
-              "Eliminar"
+              "Eliminar",
             );
             if (confirmVal === "Eliminar") {
               const currentCollections = this._loadGlobalCollections();
               const updatedCollections = currentCollections.filter(
-                (c) => !(c.name === msg.name && c.type === msg.type)
+                (c) => !(c.name === msg.name && c.type === msg.type),
               );
               const { HttpTesterPanel } = require("./http-tester.view");
-              await HttpTesterPanel.saveCollections(this._context, updatedCollections);
-              vscode.window.showInformationMessage(`Colección '${msg.name}' eliminada`);
+              await HttpTesterPanel.saveCollections(
+                this._context,
+                updatedCollections,
+              );
+              vscode.window.showInformationMessage(
+                `Colección '${msg.name}' eliminada`,
+              );
             }
-          } else if (msg.command === "showToast") {
+          } else if (msg.command === "showToast" && typeof msg.message === "string") {
             vscode.window.showInformationMessage(msg.message);
           } else if (msg.command === "ready") {
             this.refreshCollections();
             this._sendGlobalToken();
-          } else if (msg.command.startsWith("socket")) {
+          } else if (typeof msg.command === "string" && msg.command.startsWith("socket")) {
             this._handleSocketMessage(msg);
           }
         } catch (err) {
@@ -441,13 +466,12 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
         }
       },
       null,
-      this._disposables
+      this._disposables,
     );
   }
 
   private async _handleImportJson(type: "http" | "socket") {
     try {
-      // Show file picker
       const fileUri = await vscode.window.showOpenDialog({
         canSelectMany: false,
         openLabel: "Importar JSON",
@@ -457,86 +481,45 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
       });
 
       if (!fileUri || fileUri.length === 0) {
-        return; // User cancelled
+        return;
       }
 
-      // Read the file
       const fileContent = fs.readFileSync(fileUri[0].fsPath, "utf8");
+      const parsed = JSON.parse(fileContent);
+      const collections = normalizeCollections(parsed);
 
-      // Parse JSON
-      let collections: HttpCollection[];
-      try {
-        const parsed = JSON.parse(fileContent);
-
-        // Check if it's an array or a single object
-        if (Array.isArray(parsed)) {
-          collections = parsed;
-        } else {
-          collections = [parsed];
-        }
-
-        // Validate that all collections have the required fields
-        const validCollections = collections.filter((col) => {
-          return col.name && col.type && col.url;
-        });
-
-        if (validCollections.length === 0) {
-          vscode.window.showErrorMessage(
-            "El archivo JSON no contiene colecciones válidas."
-          );
-          return;
-        }
-
-        // Filter by type if needed
-        const filteredCollections = validCollections.filter(
-          (col) => col.type === type
-        );
-
-        if (filteredCollections.length === 0) {
-          vscode.window.showWarningMessage(
-            `No se encontraron colecciones de tipo "${type}" en el archivo.`
-          );
-          return;
-        }
-
-        // --- PERSISTENCE UPDATE ---
-        // Get existing Global State collections
-        const currentCollections = this._loadGlobalCollections();
-
-        // Merge new collections (avoid duplicates by name+type)
-        filteredCollections.forEach((newCol) => {
-          const existsIndex = currentCollections.findIndex(
-            (c) => c.name === newCol.name && c.type === newCol.type
-          );
-          if (existsIndex !== -1) {
-            // Update existing? Or skip? Let's update/overwrite
-            currentCollections[existsIndex] = newCol;
-          } else {
-            currentCollections.push(newCol);
-          }
-        });
-
-        // Save back to Global State and Sync
-        const { HttpTesterPanel } = require("./http-tester.view");
-        await HttpTesterPanel.saveCollections(this._context, currentCollections);
-
-        vscode.window.showInformationMessage(
-          `✅ ${filteredCollections.length} colección(es) importada(s) y guardada(s).`
-        );
-      } catch (parseError) {
+      if (collections.length === 0) {
         vscode.window.showErrorMessage(
-          `Error al parsear el archivo JSON: ${
-            parseError instanceof Error
-              ? parseError.message
-              : String(parseError)
-          }`
+          "El archivo JSON no contiene colecciones válidas.",
         );
+        return;
       }
+
+      const filteredCollections = filterCollectionsByType(collections, type);
+      if (filteredCollections.length === 0) {
+        vscode.window.showWarningMessage(
+          `No se encontraron colecciones de tipo "${type}" en el archivo.`,
+        );
+        return;
+      }
+
+      const currentCollections = this._loadGlobalCollections();
+      const updatedCollections = mergeCollections(
+        currentCollections,
+        filteredCollections,
+      );
+
+      const { HttpTesterPanel } = require("./http-tester.view");
+      await HttpTesterPanel.saveCollections(this._context, updatedCollections);
+
+      vscode.window.showInformationMessage(
+        `✅ ${filteredCollections.length} colección(es) importada(s) y guardada(s).`,
+      );
     } catch (error) {
       vscode.window.showErrorMessage(
         `Error al importar JSON: ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
       );
     }
   }
@@ -563,131 +546,53 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
       fs.writeFileSync(fileUri.fsPath, jsonContent, "utf8");
 
       vscode.window.showInformationMessage(
-        `✅ ${collections.length} colección(es) exportada(s) exitosamente a ${fileUri.fsPath}`
+        `✅ ${collections.length} colección(es) exportada(s) exitosamente a ${fileUri.fsPath}`,
       );
     } catch (error) {
       vscode.window.showErrorMessage(
         `Error al exportar JSON: ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
       );
     }
   }
 
-  private async _detectSwaggerUrls(): Promise<string[]> {
-    const urls: string[] = [];
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) return [];
-
-    for (const folder of workspaceFolders) {
-      // 1. Try to find .env files for PORT
-      const envFiles = await vscode.workspace.findFiles(
-        new vscode.RelativePattern(folder, "**/.env")
-      );
-      let port = "3000";
-      for (const envFile of envFiles) {
-        try {
-          const content = fs.readFileSync(envFile.fsPath, "utf8");
-          const portMatch = content.match(/^PORT=(\d+)/m);
-          if (portMatch) {
-            port = portMatch[1];
-            break;
-          }
-        } catch (e) {}
-      }
-
-      // 2. Try to find Swagger setup paths
-      const swaggerFiles = await vscode.workspace.findFiles(
-        new vscode.RelativePattern(folder, "**/src/**/*.ts")
-      );
-      let swaggerPath = "api/doc";
-      for (const swaggerFile of swaggerFiles) {
-        try {
-          const content = fs.readFileSync(swaggerFile.fsPath, "utf8");
-          const setupMatch = content.match(
-            /SwaggerModule\.setup\(\s*["']([^"']+)["']/
-          );
-          if (setupMatch) {
-            swaggerPath = setupMatch[1];
-            break;
-          }
-        } catch (e) {}
-      }
-
-      // Add common combinations
-      urls.push(`http://localhost:${port}/${swaggerPath}-json`);
-      urls.push(`http://localhost:${port}/api-json`);
-      urls.push(`http://localhost:${port}/swagger-json`);
-
-      // 3. Search for local Swagger/OpenAPI files
-      const localSwaggerFiles = await vscode.workspace.findFiles(
-        new vscode.RelativePattern(folder, "**/{swagger,openapi,api-docs}*.{json,yaml,yml}")
-      );
-      for (const file of localSwaggerFiles) {
-        urls.push(file.fsPath);
-      }
-    }
-
-    return [...new Set(urls)];
+  private _detectSwaggerUrls(): Promise<string[]> {
+    return detectSwaggerUrls(vscode.workspace.workspaceFolders);
   }
 
   private async _handleImportSwagger(urlOrPath: string) {
     try {
-      let openApiJson: any;
-
-      if (urlOrPath.startsWith("http")) {
-        const axios = require("axios");
-        const response = await axios.get(urlOrPath);
-        openApiJson = response.data;
-      } else {
-        const content = fs.readFileSync(urlOrPath, "utf8");
-        if (urlOrPath.endsWith(".yaml") || urlOrPath.endsWith(".yml")) {
-          const yaml = require("js-yaml");
-          openApiJson = yaml.load(content);
-        } else {
-          openApiJson = JSON.parse(content);
-        }
-      }
-
-      const baseUrl = urlOrPath.startsWith("http") 
-        ? new URL(urlOrPath).origin 
-        : "http://localhost:3000";
+      const openApiJson = await loadOpenApiJson(urlOrPath);
+      const baseUrl = resolveOpenApiBaseUrl(urlOrPath);
 
       const collections = HttpTesterGenerator.generateCollectionsFromOpenApi(
         openApiJson,
-        baseUrl
+        baseUrl,
       );
 
       if (collections.length === 0) {
         vscode.window.showWarningMessage(
-          "No se pudieron generar colecciones desde el JSON de Swagger proporcionado."
+          "No se pudieron generar colecciones desde el JSON de Swagger proporcionado.",
         );
         return;
       }
 
-      // --- PERSISTENCE UPDATE ---
       const currentCollections = this._loadGlobalCollections();
-      collections.forEach((newCol) => {
-        const existsIndex = currentCollections.findIndex(
-          (c) => c.name === newCol.name && c.type === newCol.type
-        );
-        if (existsIndex === -1) {
-          currentCollections.push(newCol);
-        } else {
-          currentCollections[existsIndex] = newCol;
-        }
-      });
+      const updatedCollections = mergeCollections(
+        currentCollections,
+        collections,
+      );
 
       const { HttpTesterPanel } = require("./http-tester.view");
-      await HttpTesterPanel.saveCollections(this._context, currentCollections);
+      await HttpTesterPanel.saveCollections(this._context, updatedCollections);
 
       vscode.window.showInformationMessage(
-        `✅ ${collections.length} peticiones importadas y guardadas desde Swagger.`
+        `✅ ${collections.length} peticiones importadas y guardadas desde Swagger.`,
       );
-    } catch (error: any) {
-      vscode.window.showErrorMessage(
-        `Error al importar Swagger: ${error.message}`
-      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      vscode.window.showErrorMessage(`Error al importar Swagger: ${message}`);
     }
   }
 

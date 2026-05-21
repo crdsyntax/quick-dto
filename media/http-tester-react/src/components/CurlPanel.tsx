@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Terminal, Send, Import } from 'lucide-react';
+import { Terminal, Send, Import, Download } from 'lucide-react';
 import { parseCurl } from '../utils/curlParser';
 
 interface CurlPanelProps {
   onImport: (request: any, autoRun: boolean) => void;
+  onExportJson?: (payload: unknown) => void;
 }
 
-export const CurlPanel: React.FC<CurlPanelProps> = ({ onImport }) => {
+export const CurlPanel: React.FC<CurlPanelProps> = ({ onImport, onExportJson }) => {
   const [curlCommand, setCurlCommand] = useState('');
   const [error, setError] = useState('');
 
@@ -24,6 +25,26 @@ export const CurlPanel: React.FC<CurlPanelProps> = ({ onImport }) => {
         return;
       }
       onImport(parsedRequest, autoRun);
+    } catch (e: any) {
+      setError(`ERROR AL PARSEAR CURL: ${e.message}`);
+    }
+  };
+
+  const handleExport = () => {
+    setError('');
+
+    if (!curlCommand.trim()) {
+      setError('POR FAVOR INGRESA UN COMANDO CURL.');
+      return;
+    }
+
+    try {
+      const parsed = parseCurl(curlCommand);
+      if (!parsed.url) {
+        setError('NO SE PUDO DETECTAR UNA URL VÁLIDA EN EL COMANDO.');
+        return;
+      }
+      onExportJson?.(parsed);
     } catch (e: any) {
       setError(`ERROR AL PARSEAR CURL: ${e.message}`);
     }
@@ -52,7 +73,7 @@ export const CurlPanel: React.FC<CurlPanelProps> = ({ onImport }) => {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-1">
           <button
             onClick={() => handleAction(false)}
             className="py-2.5 px-5 bg-bgDark border-2 border-borderDark text-textMuted hover:border-textMain hover:text-textMain transition font-bold rounded-none text-[10px] uppercase flex items-center justify-center gap-2"
@@ -67,6 +88,14 @@ export const CurlPanel: React.FC<CurlPanelProps> = ({ onImport }) => {
           >
             <Send className="w-3.5 h-3.5" />
             IMPORTAR Y EJECUTAR
+          </button>
+
+          <button
+            onClick={handleExport}
+            className="py-2.5 px-5 bg-bgDark border-2 border-accentLight text-accentLight hover:bg-accentLight hover:text-bgDark transition font-bold rounded-none text-[10px] uppercase flex items-center justify-center gap-2"
+          >
+            <Download className="w-3.5 h-3.5" />
+            EXPORTAR JSON
           </button>
         </div>
 

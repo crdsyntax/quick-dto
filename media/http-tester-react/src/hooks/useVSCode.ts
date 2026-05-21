@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { VscodePostCommand } from '../enums';
 
 // Setup VSCode API type
 declare global {
@@ -31,7 +32,7 @@ try {
 }
 
 export function useVSCode() {
-  const postMessage = useCallback((command: string, data?: any) => {
+  const postMessage = useCallback((command: VscodePostCommand, data?: any) => {
     const panelId = typeof window !== 'undefined' ? (window as any).vscodePanelId : undefined;
     vscode.postMessage({ command, panelId, ...data });
   }, []);

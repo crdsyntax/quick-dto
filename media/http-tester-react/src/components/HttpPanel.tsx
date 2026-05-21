@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { KeyValuePair, FileData, HttpResponse } from '../types';
-import { Plus, X, Play, RefreshCw, Save, Square } from 'lucide-react';
+import { Plus, X, Play, RefreshCw, Square, Download } from 'lucide-react';
 
 interface HttpPanelProps {
   initialState?: any;
@@ -13,6 +13,7 @@ interface HttpPanelProps {
   globalToken: string;
   onStateChange: (state: any) => void;
   onTokensDetected: (access: string, refresh?: string) => void;
+  onExportJson?: () => void;
 }
 
 export const HttpPanel: React.FC<HttpPanelProps> = ({
@@ -26,6 +27,7 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
   globalToken,
   onStateChange,
   onTokensDetected,
+  onExportJson,
 }) => {
   const [method, setMethod] = useState('GET');
   const [url, setUrl] = useState('');
@@ -490,9 +492,19 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
               <span className={`px-2 py-1 ${response.status >= 400 ? 'bg-textMain text-bgDark' : 'bg-transparent text-accentLight border-2 border-textMain'}`}>
                 HTTP {response.status} {response.statusText}
               </span>
-              <div className="flex gap-4">
+              <div className="flex items-center gap-4">
                 <span>TIME: <strong className="text-textMain">{response.time}ms</strong></span>
                 <span>SIZE: <strong className="text-textMain">{(response.size / 1024).toFixed(2)}KB</strong></span>
+                {onExportJson && (
+                  <button
+                    type="button"
+                    onClick={onExportJson}
+                    className="inline-flex items-center gap-2 px-3 py-1 border-2 border-accentLight text-accentLight hover:bg-accentLight hover:text-bgDark transition-all rounded-none text-[11px] uppercase"
+                  >
+                    <Download className="w-3 h-3" />
+                    Export JSON
+                  </button>
+                )}
               </div>
             </div>
             {/* Data content */}

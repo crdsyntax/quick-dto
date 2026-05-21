@@ -1,11 +1,12 @@
 import React from 'react';
-import { HttpResponse } from '../types';
+import { HttpResponse, SocketStatus } from '../types';
 import { Activity, Globe, Radio, Server, Clock, ShieldAlert, Cpu } from 'lucide-react';
+import { SocketStatusClass } from '../enums';
 
 interface MetricsPanelProps {
   httpState: any;
   httpResponse: HttpResponse | null;
-  socketStatus: { text: string; className: string };
+  socketStatus: SocketStatus;
   connectionLogs: any[];
   listenLogs: any[];
 }
@@ -22,7 +23,7 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({
   const httpSize = hasHttp ? (httpResponse.size / 1024).toFixed(2) : '0.00';
   const isHttpError = hasHttp && httpResponse.status >= 400;
 
-  const isSocketConnected = socketStatus.className === 'connected';
+  const isSocketConnected = socketStatus.className === SocketStatusClass.CONNECTED;
   const socketErrorCount = connectionLogs.filter(l => l.type === 'error').length;
   const totalSocketLogs = connectionLogs.length;
   const listenEventsCount = listenLogs.length;

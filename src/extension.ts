@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
+import * as path from "path";
 import { generateDtoCommand } from "./commands/dto.command";
 import { generateInterfaceCommand } from "./commands/interface.command";
 import { generateReturnInterfaceCommand } from "./commands/return-interface.command";
@@ -25,7 +26,7 @@ import {
   closeHttpTesterCommand,
   openHttpTesterCommand,
 } from "./commands/http-tester.command";
-import { HttpTesterSidebarProvider } from "./views/http-tester-sidebar.view";
+import { HttpTesterSidebarProvider } from "./views/http-tester-sidebar";
 import { addLoggerDebugCommand } from "./commands/logger.command";
 import { createAutoCommitService } from "./commands/auto-commit.command";
 import { generateCollectionsFromControllerCommand } from "./commands/generate-collection.command";
@@ -42,7 +43,64 @@ function getInitialEntityViewRoot(context: vscode.ExtensionContext): string | un
 
   const stored = context.workspaceState.get<string>(ENTITY_VIEW_FOLDER_KEY);
   if (stored && folders.some((f) => f.uri.fsPath === stored)) return stored;
+
+  const prismaFolder = findWorkspaceFolderWithPrismaSchema(folders);
+  if (prismaFolder) return prismaFolder;
+
   return folders[0].uri.fsPath;
+}
+
+function findWorkspaceFolderWithPrismaSchema(
+  folders: readonly vscode.WorkspaceFolder[] | undefined,
+): string | undefined {
+  if (!folders) return undefined;
+
+  for (const folder of folders) {
+    const root = folder.uri.fsPath;
+    if (findPrismaSchemaRoot(root)) {
+      return root;
+    }
+  }
+
+  return undefined;
+}
+
+function findPrismaSchemaRoot(root: string): string | undefined {
+  const candidatePaths = [
+    path.join(root, "prisma", "schema"),
+    path.join(root, "prisma", "schema.prisma"),
+    path.join(root, "schema.prisma"),
+  ];
+
+  for (const candidate of candidatePaths) {
+    if (fs.existsSync(candidate)) {
+      const stats = fs.lstatSync(candidate);
+      if (stats.isDirectory() || stats.isFile()) {
+        return root;
+      }
+    }
+  }
+
+  const entries = fs.readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory());
+  for (const entry of entries) {
+    const nestedBase = path.join(root, entry.name);
+    const nestedCandidates = [
+      path.join(nestedBase, "prisma", "schema"),
+      path.join(nestedBase, "prisma", "schema.prisma"),
+      path.join(nestedBase, "schema.prisma"),
+    ];
+
+    for (const candidate of nestedCandidates) {
+      if (fs.existsSync(candidate)) {
+        const stats = fs.lstatSync(candidate);
+        if (stats.isDirectory() || stats.isFile()) {
+          return root;
+        }
+      }
+    }
+  }
+
+  return undefined;
 }
 
 export function activate(context: vscode.ExtensionContext) {

@@ -1,4 +1,4 @@
-import { HttpRequest, KeyValuePair } from '../types';
+import { HttpRequest } from '../types';
 
 export function parseCurl(curl: string): Partial<HttpRequest> {
   const request: any = {

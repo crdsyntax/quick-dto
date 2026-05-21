@@ -25,7 +25,9 @@ export async function generateErdData(
   // Check for Prisma first
   const prismaSchemaPath = findPrismaSchema(rootPath);
   if (prismaSchemaPath) {
-    const content = fs.readFileSync(prismaSchemaPath, "utf8");
+    const content = Array.isArray(prismaSchemaPath)
+      ? prismaSchemaPath.map((p) => fs.readFileSync(p, "utf8")).join("\n")
+      : fs.readFileSync(prismaSchemaPath, "utf8");
     const entities = parsePrismaSchema(content);
     
     // Filtering logic similar to TypeORM
@@ -194,11 +196,14 @@ export async function generateErdDataForEntities(
   entityNames: string[],
   strict = false
 ): Promise<ErdDiagramData> {
-  // Check for Prisma
+  // Check for Prisma first
   const prismaSchemaPath = findPrismaSchema(rootPath);
   if (prismaSchemaPath) {
-    const content = fs.readFileSync(prismaSchemaPath, "utf8");
+    const content = Array.isArray(prismaSchemaPath)
+      ? prismaSchemaPath.map((p) => fs.readFileSync(p, "utf8")).join("\n")
+      : fs.readFileSync(prismaSchemaPath, "utf8");
     const entities = parsePrismaSchema(content);
+
 
     const subEntities: Record<string, EntityData> = {};
     const entitiesToInclude = new Set<string>(entityNames);

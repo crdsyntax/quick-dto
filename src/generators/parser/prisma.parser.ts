@@ -104,17 +104,46 @@ export function parsePrismaSchema(schemaContent: string): Record<string, EntityD
   return entities;
 }
 
-export function findPrismaSchema(rootPath: string): string | null {
-  const commonPaths = [
-    path.join(rootPath, "prisma", "schema.prisma"),
-    path.join(rootPath, "schema.prisma"),
-  ];
-
-  for (const p of commonPaths) {
-    if (fs.existsSync(p)) {
-      return p;
+export function findPrismaSchema(rootPath: string): string | string[] | null {
+  const checkPath = (base: string): string | string[] | null => {
+    const multiFileSchemaDir = path.join(base, "prisma", "schema");
+    if (fs.existsSync(multiFileSchemaDir) && fs.lstatSync(multiFileSchemaDir).isDirectory()) {
+      const files = fs.readdirSync(multiFileSchemaDir)
+        .filter(f => f.endsWith(".prisma"))
+        .map(f => path.join(multiFileSchemaDir, f));
+      return files.length > 0 ? files : null;
     }
+
+    const commonPaths = [
+      path.join(base, "prisma", "schema.prisma"),
+      path.join(base, "schema.prisma"),
+    ];
+
+    for (const p of commonPaths) {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    }
+    return null;
+  };
+
+  // 1. Check root
+  const rootResult = checkPath(rootPath);
+  if (rootResult) return rootResult;
+
+  // 2. Check one level deep for monorepos
+  try {
+    const entries = fs.readdirSync(rootPath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const nestedResult = checkPath(path.join(rootPath, entry.name));
+        if (nestedResult) return nestedResult;
+      }
+    }
+  } catch (e) {
+    // skip
   }
 
   return null;
 }
+
