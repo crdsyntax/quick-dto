@@ -1,7 +1,5 @@
-packages:
-  - "."
-  - "media/http-tester-react"
-  - "media/erd-visualizer-react"
-  - "media/flowchart-editor-react"
 allowBuilds:
+  '@vscode/vsce-sign': set this to true or false
   esbuild: true
+  keytar: false
+  puppeteer: false

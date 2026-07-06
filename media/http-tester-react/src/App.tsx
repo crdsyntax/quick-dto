@@ -6,7 +6,6 @@ import { MetricsPanel } from './components/MetricsPanel';
 import { BatchProgressBar } from './components/BatchProgressBar';
 import { RetroBackground } from './components/RetroBackground';
 import { AppHeader } from './components/AppHeader';
-import { CollectionPanel } from './components/CollectionPanel';
 import { TabNavigation } from './components/TabNavigation';
 import { AppLoadingOverlay } from './components/AppLoadingOverlay';
 import { useAppLogic } from './hooks/useAppLogic';
@@ -60,34 +59,59 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-zinc-950 font-mono text-emerald-500 overflow-x-hidden">
+    <div className="relative min-h-screen bg-bgDark text-textMain overflow-x-hidden">
       {state.isRepeating && (
-        <BatchProgressBar 
-          progress={state.repeatProgress} 
-          onStop={actions.handleStopRepeatedRequests} 
+        <BatchProgressBar
+          progress={state.repeatProgress}
+          onStop={actions.handleStopRepeatedRequests}
         />
       )}
 
-      <RetroBackground isError={state.isError} />
-
-      <div className="relative z-10 max-w-[1170px] mx-auto px-5 py-7 flex flex-col gap-5 selection:bg-textMain selection:text-bgDark">
-        <AppHeader />
+      <div className="relative z-10 max-w-[1170px] mx-auto px-5 py-6 flex flex-col gap-4">
+        <div className="relative">
+          <AppHeader />
+          <RetroBackground status={state.httpResponse?.status ?? null} />
+        </div>
 
         {(state.currentTab === AppTab.HTTP || state.currentTab === AppTab.SOCKET) && (
-          <CollectionPanel
-            name={state.collectionName}
-            group={state.collectionGroup}
-            onNameChange={actions.setCollectionName}
-            onGroupChange={actions.setCollectionGroup}
-            onSave={actions.handleSaveCollection}
-          />
+          <div className="bg-bgPanel/40 border border-borderDark rounded-lg p-4 shadow-card">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-textMuted">Collection name</label>
+                <input
+                  type="text"
+                  value={state.collectionName}
+                  onChange={(e) => actions.setCollectionName(e.target.value)}
+                  placeholder="e.g. Get Users List"
+                  className="px-3 py-2 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors placeholder:text-textMuted/50"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-textMuted">Group name</label>
+                <input
+                  type="text"
+                  value={state.collectionGroup}
+                  onChange={(e) => actions.setCollectionGroup(e.target.value)}
+                  placeholder="e.g. User Management"
+                  className="px-3 py-2 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors placeholder:text-textMuted/50"
+                />
+              </div>
+              <button
+                onClick={actions.handleSaveCollection}
+                className="h-[38px] bg-textMain text-bgDark hover:bg-accentLight transition-colors rounded-lg text-xs font-semibold flex items-center justify-center gap-2 shadow-card"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                Save to collection
+              </button>
+            </div>
+          </div>
         )}
 
-        <div className="flex gap-5 items-start">
-          <main className="flex-grow flex flex-col gap-4 min-w-0">
-            <TabNavigation 
-              currentTab={state.currentTab} 
-              onTabChange={handleTabChange} 
+        <div className="flex gap-4 items-start">
+          <main className="flex-grow flex flex-col gap-3 min-w-0">
+            <TabNavigation
+              currentTab={state.currentTab}
+              onTabChange={handleTabChange}
             />
 
             <div className="transition-all duration-300">

@@ -185,13 +185,13 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-4 w-full">
+    <div className="flex flex-col gap-3 w-full">
       {/* Request Line */}
-      <div className="flex gap-2 items-center">
+      <div className="flex gap-2 items-stretch">
         <select
           value={method}
           onChange={(e) => setMethod(e.target.value)}
-          className="w-28 p-2.5 bg-bgDark border-2 border-borderDark text-textMain font-bold uppercase rounded-none text-xs focus:border-accentLight focus:outline-none"
+          className="w-24 px-3 py-2 bg-bgPanel border border-borderDark rounded-lg text-sm font-medium text-textMain focus:border-textMuted transition-colors"
         >
           {['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'].map((m) => (
             <option key={m} value={m}>{m}</option>
@@ -202,165 +202,167 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://api.example.com/v1/resource"
-          className="flex-grow p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none placeholder-textMuted"
+          className="flex-1 px-3 py-2 bg-bgPanel border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors placeholder:text-textMuted/50"
         />
         <button
           onClick={() => handleSend(1)}
           disabled={isLoading || isRepeating}
-          className="px-5 h-[42px] bg-bgDark border-2 border-textMain text-textMain hover:bg-textMain hover:text-bgDark disabled:opacity-50 transition font-bold rounded-none text-[10px] uppercase flex items-center gap-2"
+          className="px-5 bg-textMain text-bgDark hover:bg-accentLight disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg text-xs font-semibold flex items-center gap-2 shadow-card"
         >
-          <Play className="w-3 h-3 fill-current" />
-          SEND
+          <Play className="w-3.5 h-3.5 fill-current" />
+          Send
         </button>
       </div>
 
       {/* Repeat Request & Content Type Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end bg-bgPanel/20 backdrop-blur-md p-3.5 border-2 border-borderDark rounded-none">
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-bold uppercase text-textMuted">REPEAT COUNT</label>
-          <input
-            type="number"
-            min="1"
-            max="1000"
-            value={repeatCount}
-            onChange={(e) => setRepeatCount(parseInt(e.target.value) || 1)}
-            disabled={isRepeating}
-            className="p-2 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none disabled:opacity-50"
-          />
+      <div className="bg-bgPanel/40 border border-borderDark rounded-lg p-3 shadow-card">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium text-textMuted">Repeat count</label>
+            <input
+              type="number"
+              min="1"
+              max="1000"
+              value={repeatCount}
+              onChange={(e) => setRepeatCount(parseInt(e.target.value) || 1)}
+              disabled={isRepeating}
+              className="px-3 py-1.5 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors disabled:opacity-40"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium text-textMuted">Delay (ms)</label>
+            <input
+              type="number"
+              min="0"
+              step="100"
+              value={repeatDelay}
+              onChange={(e) => setRepeatDelay(parseInt(e.target.value) || 0)}
+              disabled={isRepeating}
+              className="px-3 py-1.5 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors disabled:opacity-40"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium text-textMuted">Content type</label>
+            <select
+              value={contentType}
+              onChange={(e) => setContentType(e.target.value)}
+              disabled={isRepeating}
+              className="px-3 py-1.5 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors disabled:opacity-40"
+            >
+              <option value="json">JSON</option>
+              <option value="formdata">FormData</option>
+            </select>
+          </div>
+          {isRepeating ? (
+            <button
+              onClick={onStopRepeatedRequests}
+              className="w-full h-[34px] bg-textMain text-bgDark hover:bg-accentLight transition-colors rounded-lg text-xs font-semibold flex items-center justify-center gap-2 shadow-card"
+            >
+              <Square className="w-3 h-3 fill-current" />
+              Stop requests
+            </button>
+          ) : (
+            <button
+              onClick={() => handleSend(repeatCount)}
+              disabled={isLoading}
+              className="w-full h-[34px] bg-bgDark border border-borderDark text-textMain hover:border-textMuted disabled:opacity-40 transition-colors rounded-lg text-xs font-medium flex items-center justify-center gap-2"
+            >
+              <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
+              Repeat ({repeatCount})
+            </button>
+          )}
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-bold uppercase text-textMuted">DELAY (MS)</label>
-          <input
-            type="number"
-            min="0"
-            step="100"
-            value={repeatDelay}
-            onChange={(e) => setRepeatDelay(parseInt(e.target.value) || 0)}
-            disabled={isRepeating}
-            className="p-2 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none disabled:opacity-50"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[10px] font-bold uppercase text-textMuted">CONTENT TYPE</label>
-          <select
-            value={contentType}
-            onChange={(e) => setContentType(e.target.value)}
-            disabled={isRepeating}
-            className="p-2 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none uppercase disabled:opacity-50"
-          >
-            <option value="json">JSON</option>
-            <option value="formdata">FormData</option>
-          </select>
-        </div>
-        {isRepeating ? (
-          <button
-            onClick={onStopRepeatedRequests}
-            className="w-full h-[38px] bg-textMain text-bgDark hover:bg-accentLight transition font-bold rounded-none text-[10px] uppercase flex items-center justify-center gap-2 shadow-retro"
-          >
-            <Square className="w-3 h-3 fill-current" />
-            STOP REQUESTS
-          </button>
-        ) : (
-          <button
-            onClick={() => handleSend(repeatCount)}
-            disabled={isLoading}
-            className="w-full h-[38px] bg-bgDark border-2 border-borderDark hover:border-textMain text-textMain transition font-bold rounded-none text-[10px] uppercase flex items-center justify-center gap-2"
-          >
-            <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
-            REPEAT REQUEST
-          </button>
-        )}
       </div>
 
       {/* Sub tabs header */}
-      <div className="flex border-b-2 border-borderDark">
+      <div className="flex gap-1 bg-bgPanel/30 border border-borderDark rounded-lg p-0.5">
         {(['body', 'params', 'headers', 'files', 'auth'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveSubTab(tab)}
-            className={`px-4 py-2 text-[10px] font-bold uppercase transition-all border-b-2 tracking-wider ${
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
               activeSubTab === tab
-                ? 'border-textMain text-accentLight bg-bgPanel/20 backdrop-blur-md'
-                : 'border-transparent text-textMuted hover:text-textMain'
+                ? 'bg-bgDark text-textMain shadow-card'
+                : 'text-textMuted hover:text-textMain'
             }`}
           >
-            {tab === 'params' ? 'QUERY PARAMS' : tab}
+            {tab === 'params' ? 'Query Params' : tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
       </div>
 
       {/* Sub tabs content */}
-      <div className="bg-bgPanel/20 backdrop-blur-md border-2 border-borderDark rounded-none p-5 min-h-[160px]">
+      <div className="bg-bgPanel/20 border border-borderDark rounded-lg p-4 min-h-[160px] shadow-card">
         {/* Body tab */}
         {activeSubTab === 'body' && (
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="REQUEST BODY"
-            className="w-full min-h-[140px] p-3 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none resize-y placeholder-textMuted"
+            placeholder="Request body (JSON)"
+            className="w-full min-h-[140px] px-3 py-2 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors resize-y placeholder:text-textMuted/50 font-mono"
           />
         )}
 
         {/* Query Params tab */}
         {activeSubTab === 'params' && (
-          <div className="flex flex-col gap-3">
-            <h4 className="text-xs font-bold text-textMuted uppercase">QUERY PARAMETERS</h4>
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-medium text-textMuted">Query parameters</p>
             {queryParams.map((param, index) => (
               <div key={index} className="flex gap-2 items-center">
                 <input
                   type="text"
                   value={param.key}
                   onChange={(e) => updateQueryParam(index, 'key', e.target.value)}
-                  placeholder="KEY"
-                  className="flex-1 p-2 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
+                  placeholder="Key"
+                  className="flex-1 px-3 py-1.5 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors placeholder:text-textMuted/50"
                 />
                 <input
                   type="text"
                   value={param.value}
                   onChange={(e) => updateQueryParam(index, 'value', e.target.value)}
-                  placeholder="VALUE"
-                  className="flex-1 p-2 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
+                  placeholder="Value"
+                  className="flex-1 px-3 py-1.5 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors placeholder:text-textMuted/50"
                 />
                 <button
                   onClick={() => removeQueryParam(index)}
-                  className="p-2 text-textMuted hover:text-accentLight transition"
+                  className="p-1.5 text-textMuted hover:text-textMain transition-colors rounded-md hover:bg-bgPanel"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             ))}
             <button
               onClick={addQueryParam}
-              className="self-start mt-2 px-2.5 py-1 bg-bgDark border-2 border-borderDark text-textMain hover:border-textMain transition font-bold rounded-none text-[9px] uppercase flex items-center gap-1"
+              className="self-start mt-1 px-2.5 py-1 bg-bgDark border border-borderDark text-textMain hover:border-textMuted transition-colors rounded-lg text-xs font-medium flex items-center gap-1"
             >
-              <Plus className="w-3 h-3" /> ADD PARAM
+              <Plus className="w-3 h-3" /> Add param
             </button>
           </div>
         )}
 
         {/* Headers tab */}
         {activeSubTab === 'headers' && (
-          <div className="flex flex-col gap-2.5">
-            <h4 className="text-[10px] font-bold text-textMuted uppercase">HEADERS</h4>
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-medium text-textMuted">Headers</p>
             {headers.map((header, index) => (
               <div key={index} className="flex gap-2 items-center">
                 <input
                   type="text"
                   value={header.key}
                   onChange={(e) => updateHeader(index, 'key', e.target.value)}
-                  placeholder="HEADER NAME"
-                  className="flex-1 p-1.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none"
+                  placeholder="Header name"
+                  className="flex-1 px-3 py-1.5 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors placeholder:text-textMuted/50"
                 />
                 <input
                   type="text"
                   value={header.value}
                   onChange={(e) => updateHeader(index, 'value', e.target.value)}
-                  placeholder="VALUE"
-                  className="flex-1 p-1.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none"
+                  placeholder="Value"
+                  className="flex-1 px-3 py-1.5 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors placeholder:text-textMuted/50"
                 />
                 <button
                   onClick={() => removeHeader(index)}
-                  className="p-1.5 text-textMuted hover:text-accentLight transition"
+                  className="p-1.5 text-textMuted hover:text-textMain transition-colors rounded-md hover:bg-bgPanel"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -368,34 +370,34 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
             ))}
             <button
               onClick={addHeader}
-              className="self-start mt-2 px-2.5 py-1 bg-bgDark border-2 border-borderDark text-textMain hover:border-textMain transition font-bold rounded-none text-[9px] uppercase flex items-center gap-1"
+              className="self-start mt-1 px-2.5 py-1 bg-bgDark border border-borderDark text-textMain hover:border-textMuted transition-colors rounded-lg text-xs font-medium flex items-center gap-1"
             >
-              <Plus className="w-3 h-3" /> ADD HEADER
+              <Plus className="w-3 h-3" /> Add header
             </button>
           </div>
         )}
 
         {/* Files tab */}
         {activeSubTab === 'files' && (
-          <div className="flex flex-col gap-2.5">
-            <h4 className="text-[10px] font-bold text-textMuted uppercase">FILES (FORMDATA)</h4>
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-medium text-textMuted">Files (FormData)</p>
             {files.map((file, index) => (
               <div key={index} className="flex gap-2 items-center">
                 <input
                   type="text"
                   value={file.fieldName}
                   onChange={(e) => updateFileRow(index, e.target.value)}
-                  placeholder="FIELD NAME"
-                  className="flex-1 p-1.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none"
+                  placeholder="Field name"
+                  className="flex-1 px-3 py-1.5 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors placeholder:text-textMuted/50"
                 />
                 <input
                   type="file"
                   onChange={(e) => handleFileChange(index, e)}
-                  className="flex-1 p-1 bg-bgDark border-2 border-borderDark text-textMuted rounded-none text-[10px] focus:border-accentLight focus:outline-none"
+                  className="flex-1 px-2 py-1.5 bg-bgDark border border-borderDark rounded-lg text-xs text-textMuted file:mr-2 file:py-0.5 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-textMain file:text-bgDark hover:file:bg-accentLight transition-colors"
                 />
                 <button
                   onClick={() => removeFileRow(index)}
-                  className="p-1.5 text-textMuted hover:text-accentLight transition"
+                  className="p-1.5 text-textMuted hover:text-textMain transition-colors rounded-md hover:bg-bgPanel"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -403,9 +405,9 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
             ))}
             <button
               onClick={addFileRow}
-              className="self-start mt-2 px-2.5 py-1 bg-bgDark border-2 border-borderDark text-textMain hover:border-textMain transition font-bold rounded-none text-[9px] uppercase flex items-center gap-1"
+              className="self-start mt-1 px-2.5 py-1 bg-bgDark border border-borderDark text-textMain hover:border-textMuted transition-colors rounded-lg text-xs font-medium flex items-center gap-1"
             >
-              <Plus className="w-3 h-3" /> ADD FILE
+              <Plus className="w-3 h-3" /> Add file
             </button>
           </div>
         )}
@@ -413,68 +415,68 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
         {/* Auth tab */}
         {activeSubTab === 'auth' && (
           <div className="flex flex-col gap-4">
-            <div className="flex border-b-2 border-borderDark mb-2">
+            <div className="flex gap-1 bg-bgPanel/40 border border-borderDark rounded-lg p-0.5 w-fit">
               {['global', 'none', 'bearer', 'basic'].map((type) => (
                 <button
                   key={type}
                   onClick={() => setAuthType(type)}
-                  className={`px-4 py-2 text-xs font-bold uppercase transition border-b-4 ${
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
                     authType === type
-                      ? 'border-textMain text-accentLight'
-                      : 'border-transparent text-textMuted hover:text-textMain'
+                      ? 'bg-bgDark text-textMain shadow-card'
+                      : 'text-textMuted hover:text-textMain'
                   }`}
                 >
-                  {type === 'global' ? 'GLOBAL (INHERIT)' : type}
+                  {type === 'global' ? 'Global' : type.charAt(0).toUpperCase() + type.slice(1)}
                 </button>
               ))}
             </div>
 
             {authType === 'global' && (
-              <div className="text-textMuted italic text-sm border-l-4 border-borderDark pl-3">
-                &gt; Utilizando token global heredado del panel de configuración.
-                <div className="mt-2 text-xs text-textMain font-bold">
-                  TOKEN: {globalToken || 'NOT SET'}
+              <div className="text-textMuted text-sm border-l-2 border-textMuted pl-3">
+                Using global token from settings.
+                <div className="mt-1.5 text-xs font-mono text-textMain bg-bgDark rounded-md px-2 py-1">
+                  Token: {globalToken || 'Not set'}
                 </div>
               </div>
             )}
 
             {authType === 'none' && (
-              <p className="text-textMuted text-sm border-l-4 border-borderDark pl-3">&gt; NO AUTHENTICATION.</p>
+              <p className="text-textMuted text-sm border-l-2 border-textMuted pl-3">No authentication.</p>
             )}
 
             {authType === 'bearer' && (
-              <div className="flex flex-col gap-2">
-                <label className="text-xs uppercase font-bold text-textMuted">BEARER TOKEN</label>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-textMuted">Bearer token</label>
                 <input
                   type="text"
                   value={authToken}
                   onChange={(e) => setAuthToken(e.target.value)}
-                  placeholder="ENTER TOKEN"
-                  className="w-full p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight focus:outline-none"
+                  placeholder="Enter token"
+                  className="w-full px-3 py-2 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors placeholder:text-textMuted/50 font-mono"
                 />
               </div>
             )}
 
             {authType === 'basic' && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs uppercase font-bold text-textMuted">USERNAME</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-textMuted">Username</label>
                   <input
                     type="text"
                     value={basicUsername}
                     onChange={(e) => setBasicUsername(e.target.value)}
-                    placeholder="USERNAME"
-                    className="p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight"
+                    placeholder="Username"
+                    className="px-3 py-2 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors"
                   />
                 </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs uppercase font-bold text-textMuted">PASSWORD</label>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-textMuted">Password</label>
                   <input
                     type="password"
                     value={basicPassword}
                     onChange={(e) => setBasicPassword(e.target.value)}
-                    placeholder="PASSWORD"
-                    className="p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-sm focus:border-accentLight"
+                    placeholder="Password"
+                    className="px-3 py-2 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors"
                   />
                 </div>
               </div>
@@ -485,36 +487,40 @@ export const HttpPanel: React.FC<HttpPanelProps> = ({
 
       {/* Response Panel */}
       {response && (
-        <div className="relative bg-bgDark/20 backdrop-blur-md border-2 border-borderDark rounded-none mt-4 overflow-hidden shadow-retro-dark min-h-[200px]">
-          <div className="relative z-10">
-            {/* Header */}
-            <div className="flex justify-between items-center bg-bgPanel/10 px-5 py-3 border-b-2 border-borderDark text-xs font-bold text-textMuted uppercase">
-              <span className={`px-2 py-1 ${response.status >= 400 ? 'bg-textMain text-bgDark' : 'bg-transparent text-accentLight border-2 border-textMain'}`}>
-                HTTP {response.status} {response.statusText}
+        <div className="bg-bgPanel/30 border border-borderDark rounded-lg overflow-hidden shadow-card min-h-[200px]">
+          {/* Header */}
+          <div className="flex justify-between items-center px-4 py-3 border-b border-borderDark">
+            <span className="flex items-center gap-2">
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold ${
+                response.status >= 400
+                  ? 'bg-textMain text-bgDark'
+                  : 'bg-bgDark border border-textMain text-textMain'
+              }`}>
+                {response.status} {response.statusText}
               </span>
-              <div className="flex items-center gap-4">
-                <span>TIME: <strong className="text-textMain">{response.time}ms</strong></span>
-                <span>SIZE: <strong className="text-textMain">{(response.size / 1024).toFixed(2)}KB</strong></span>
-                {onExportJson && (
-                  <button
-                    type="button"
-                    onClick={onExportJson}
-                    className="inline-flex items-center gap-2 px-3 py-1 border-2 border-accentLight text-accentLight hover:bg-accentLight hover:text-bgDark transition-all rounded-none text-[11px] uppercase"
-                  >
-                    <Download className="w-3 h-3" />
-                    Export JSON
-                  </button>
-                )}
-              </div>
+            </span>
+            <div className="flex items-center gap-4 text-xs text-textMuted">
+              <span><span className="text-textMain font-medium">{response.time}ms</span></span>
+              <span><span className="text-textMain font-medium">{(response.size / 1024).toFixed(2)}KB</span></span>
+              {onExportJson && (
+                <button
+                  type="button"
+                  onClick={onExportJson}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-textMain text-textMain hover:bg-textMain hover:text-bgDark transition-all text-xs font-medium"
+                >
+                  <Download className="w-3 h-3" />
+                  Export JSON
+                </button>
+              )}
             </div>
-            {/* Data content */}
-            <div className="p-5 overflow-auto max-h-[400px]">
-              <pre className="text-xs text-textMain whitespace-pre-wrap leading-relaxed">
-                {typeof response.data === 'object'
-                  ? JSON.stringify(response.data, null, 2)
-                  : response.data}
-              </pre>
-            </div>
+          </div>
+          {/* Data content */}
+          <div className="p-4 overflow-auto max-h-[400px]">
+            <pre className="text-sm text-textMain whitespace-pre-wrap leading-relaxed font-mono">
+              {typeof response.data === 'object'
+                ? JSON.stringify(response.data, null, 2)
+                : response.data}
+            </pre>
           </div>
         </div>
       )}

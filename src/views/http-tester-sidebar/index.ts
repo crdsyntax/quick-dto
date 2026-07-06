@@ -5,6 +5,7 @@ import {
   HttpCollection,
   HttpTesterGenerator,
 } from "../../generators/http-tester.generator";
+import { HttpTesterPanel } from "../http-tester.view";
 import { loadSidebarHtml } from "./helpers/webview.helpers";
 import {
   buildSocketClientOptions,
@@ -274,14 +275,12 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
       async (msg: WebviewMessage) => {
         try {
           if (msg.command === "sendRequest") {
-            // Abrir el HTTP Tester Panel en el editor
             const { HttpTesterPanel } = require("./http-tester.view");
             const panel = HttpTesterPanel.createOrShow(
               this._extensionUri,
               this._context,
             );
 
-            // Enviar la petición al panel del editor
             setTimeout(() => {
               panel._panel.webview.postMessage({
                 command: "loadRequest",
@@ -289,21 +288,7 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
               });
             }, 1000);
           } else if (msg.command === "openInEditor") {
-            // Abrir colección en el editor
-            const { HttpTesterPanel } = require("./http-tester.view");
-            const panel = HttpTesterPanel.createOrShow(
-              this._extensionUri,
-              this._context,
-            );
-
-            // Cargar la colección en el panel del editor
-            setTimeout(() => {
-              // Send only the single collection to load into the form
-              panel._panel.webview.postMessage({
-                command: "loadCollection",
-                collection: msg.collection,
-              });
-            }, 1000);
+            vscode.commands.executeCommand("nest-tools.openHttpTesterNewTab");
           } else if (msg.command === "saveCollection") {
             const currentCollections = this._loadGlobalCollections();
             const newCollection = msg.collection as HttpCollection;

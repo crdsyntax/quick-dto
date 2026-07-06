@@ -9,26 +9,26 @@ interface TabNavigationProps {
 
 export const TabNavigation: React.FC<TabNavigationProps> = ({ currentTab, onTabChange }) => {
   const tabs = [
-    { id: AppTab.HTTP, label: 'HTTP_MODE' },
-    { id: AppTab.CURL, label: 'CURL_MODE', icon: <Terminal className="w-3.5 h-3.5" /> },
-    { id: AppTab.SOCKET, label: 'SOCKET_MODE' },
-    { id: AppTab.METRICS, label: 'METRICS_MODE' },
+    { id: AppTab.HTTP, label: 'HTTP' },
+    { id: AppTab.CURL, label: 'CURL', icon: <Terminal className="w-3.5 h-3.5" /> },
+    { id: AppTab.SOCKET, label: 'Socket' },
+    { id: AppTab.METRICS, label: 'Metrics' },
   ];
 
   return (
-    <div className="flex border-b-2 border-borderDark">
+    <div className="flex gap-0.5 bg-bgPanel/60 border border-borderDark rounded-lg p-0.5">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           onClick={() => onTabChange(tab.id)}
-          className={`px-5 py-2.5 font-bold uppercase tracking-wider text-xs transition-all border-b-2 flex items-center gap-2 ${
+          className={`flex-1 px-4 py-2 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1.5 ${
             currentTab === tab.id
-              ? 'border-textMain text-accentLight bg-bgPanel/20 backdrop-blur-md'
-              : 'border-transparent text-textMuted hover:text-textMain'
+              ? 'bg-bgDark text-textMain shadow-card'
+              : 'text-textMuted hover:text-textMain'
           }`}
         >
           {tab.icon}
-          &gt; {tab.label}
+          {tab.label}
         </button>
       ))}
     </div>

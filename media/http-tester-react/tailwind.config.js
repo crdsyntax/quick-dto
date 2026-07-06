@@ -7,19 +7,25 @@ export default {
   theme: {
     extend: {
       colors: {
-        bgDark: "#121212", 
-        bgPanel: "#1a1a1a", 
-        borderDark: "#333333", 
-        accentLight: "#ffffff", 
-        textMain: "#f0f0f0", 
-        textMuted: "#a0a0a0", 
+        bgDark: "#121212",
+        bgPanel: "#1a1a1a",
+        borderDark: "#333333",
+        accentLight: "#ffffff",
+        textMain: "#f0f0f0",
+        textMuted: "#a0a0a0",
       },
       fontFamily: {
-        mono: ['Courier New', 'Courier', 'monospace'],
+        mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace'],
+        sans: ['Inter', 'Segoe UI', 'system-ui', '-apple-system', 'sans-serif'],
+      },
+      borderRadius: {
+        'modern': '0.625rem',
       },
       boxShadow: {
-        'retro': '3px 3px 0px 0px rgba(255, 255, 255, 0.8)',
-        'retro-dark': '3px 3px 0px 0px rgba(80, 80, 80, 0.5)'
+        'card': '0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)',
+        'card-hover': '0 4px 12px rgba(0,0,0,0.4)',
+        'glow-emerald': '0 0 12px rgba(16, 185, 129, 0.15)',
+        'glow-red': '0 0 12px rgba(220, 38, 38, 0.15)',
       }
     },
   },

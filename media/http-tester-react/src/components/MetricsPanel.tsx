@@ -29,70 +29,69 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({
   const listenEventsCount = listenLogs.length;
 
   return (
-    <div className="flex flex-col gap-6 w-full font-mono">
-      <div className="bg-bgPanel/80 backdrop-blur-sm border-2 border-borderDark p-4 flex items-center gap-3 shadow-retro-dark">
-        <Activity className="w-6 h-6 text-accentLight" />
-        <h2 className="text-xl font-bold uppercase text-accentLight">System Telemetry & Metrics</h2>
+    <div className="flex flex-col gap-5 w-full">
+      <div className="bg-bgPanel/40 border border-borderDark rounded-lg p-3 flex items-center gap-3 shadow-card">
+        <Activity className="w-5 h-5 text-textMain" />
+        <h2 className="text-sm font-semibold text-textMain">System telemetry & metrics</h2>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* HTTP Metrics */}
-        <div className="bg-bgDark/60 backdrop-blur-sm border-2 border-borderDark rounded-none p-5 shadow-retro-dark flex flex-col gap-4">
-          <div className="flex items-center gap-2 border-b-2 border-borderDark pb-2">
-            <Globe className="w-5 h-5 text-textMuted" />
-            <h3 className="text-sm font-bold uppercase text-textMuted">&gt; HTTP_TELEMETRY</h3>
+        <div className="bg-bgPanel/30 border border-borderDark rounded-lg p-4 shadow-card flex flex-col gap-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-borderDark">
+            <Globe className="w-4 h-4 text-textMuted" />
+            <h3 className="text-xs font-medium text-textMuted">HTTP telemetry</h3>
           </div>
 
           {!hasHttp ? (
-            <div className="text-textMuted italic flex items-center justify-center h-40 font-bold uppercase">
-              NO HTTP DATA RECORDED
+            <div className="text-textMuted italic flex items-center justify-center h-32 text-sm font-medium">
+              No HTTP data recorded
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-bgPanel/40 border-2 border-borderDark p-3 flex flex-col gap-1">
-                  <span className="text-[10px] uppercase font-bold text-textMuted">LAST STATUS</span>
-                  <span className={`text-xl font-bold ${isHttpError ? 'text-textMain' : 'text-accentLight'}`}>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-bgDark/50 border border-borderDark rounded-lg p-3 flex flex-col gap-1">
+                  <span className="text-[11px] font-medium text-textMuted">Last status</span>
+                  <span className={`text-lg font-semibold ${isHttpError ? 'text-textMain' : 'text-textMain'}`}>
                     {httpResponse.status} {httpResponse.statusText}
                   </span>
                 </div>
-                <div className="bg-bgPanel/40 border-2 border-borderDark p-3 flex flex-col gap-1">
-                  <span className="text-[10px] uppercase font-bold text-textMuted">RESPONSE TIME</span>
-                  <span className="text-xl font-bold text-accentLight flex items-center gap-1">
+                <div className="bg-bgDark/50 border border-borderDark rounded-lg p-3 flex flex-col gap-1">
+                  <span className="text-[11px] font-medium text-textMuted">Response time</span>
+                  <span className="text-lg font-semibold text-textMain flex items-center gap-1">
                     <Clock className="w-4 h-4" /> {httpTime}ms
                   </span>
                 </div>
-                <div className="bg-bgPanel/40 border-2 border-borderDark p-3 flex flex-col gap-1">
-                  <span className="text-[10px] uppercase font-bold text-textMuted">PAYLOAD SIZE</span>
-                  <span className="text-xl font-bold text-accentLight flex items-center gap-1">
+                <div className="bg-bgDark/50 border border-borderDark rounded-lg p-3 flex flex-col gap-1">
+                  <span className="text-[11px] font-medium text-textMuted">Payload size</span>
+                  <span className="text-lg font-semibold text-textMain flex items-center gap-1">
                     <Server className="w-4 h-4" /> {httpSize}KB
                   </span>
                 </div>
-                <div className="bg-bgPanel/40 border-2 border-borderDark p-3 flex flex-col gap-1">
-                  <span className="text-[10px] uppercase font-bold text-textMuted">METHOD</span>
-                  <span className="text-xl font-bold text-accentLight">
+                <div className="bg-bgDark/50 border border-borderDark rounded-lg p-3 flex flex-col gap-1">
+                  <span className="text-[11px] font-medium text-textMuted">Method</span>
+                  <span className="text-lg font-semibold text-textMain">
                     {httpState?.method || 'UNKNOWN'}
                   </span>
                 </div>
               </div>
 
-              <div className="mt-2 flex flex-col gap-2">
-                <span className="text-[10px] uppercase font-bold text-textMuted">TARGET ENDPOINT</span>
-                <div className="bg-bgPanel/40 border-2 border-borderDark p-3 text-xs text-accentLight overflow-x-auto whitespace-nowrap">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-medium text-textMuted">Target endpoint</span>
+                <div className="bg-bgDark/50 border border-borderDark rounded-lg p-2.5 text-sm text-textMain font-mono overflow-x-auto whitespace-nowrap">
                   {httpState?.url || 'N/A'}
                 </div>
               </div>
 
-              {/* Pseudo-visual performance bar */}
-              <div className="mt-4 flex flex-col gap-1">
-                <div className="flex justify-between text-[10px] uppercase font-bold text-textMuted">
-                  <span>Performance Rating</span>
-                  <span>{httpTime < 100 ? 'EXCELLENT' : httpTime < 500 ? 'GOOD' : httpTime < 1500 ? 'MODERATE' : 'POOR'}</span>
+              <div className="flex flex-col gap-1">
+                <div className="flex justify-between text-[11px] font-medium text-textMuted">
+                  <span>Performance</span>
+                  <span>{httpTime < 100 ? 'Excellent' : httpTime < 500 ? 'Good' : httpTime < 1500 ? 'Moderate' : 'Poor'}</span>
                 </div>
-                <div className="w-full h-4 bg-bgPanel/40 border-2 border-borderDark flex">
-                  <div 
-                    className="h-full bg-textMain transition-all" 
-                    style={{ width: `${Math.max(5, 100 - (httpTime / 20))}%` }} 
+                <div className="w-full h-2 bg-bgDark/60 border border-borderDark rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-textMain rounded-full transition-all"
+                    style={{ width: `${Math.max(5, 100 - (httpTime / 20))}%` }}
                   />
                 </div>
               </div>
@@ -101,57 +100,56 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({
         </div>
 
         {/* Socket Metrics */}
-        <div className="bg-bgDark/60 backdrop-blur-sm border-2 border-borderDark rounded-none p-5 shadow-retro-dark flex flex-col gap-4">
-          <div className="flex items-center gap-2 border-b-2 border-borderDark pb-2">
-            <Radio className="w-5 h-5 text-textMuted" />
-            <h3 className="text-sm font-bold uppercase text-textMuted">&gt; SOCKET_TELEMETRY</h3>
+        <div className="bg-bgPanel/30 border border-borderDark rounded-lg p-4 shadow-card flex flex-col gap-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-borderDark">
+            <Radio className="w-4 h-4 text-textMuted" />
+            <h3 className="text-xs font-medium text-textMuted">Socket telemetry</h3>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-bgPanel/40 border-2 border-borderDark p-3 flex flex-col gap-1">
-              <span className="text-[10px] uppercase font-bold text-textMuted">STATUS</span>
-              <span className={`text-xl font-bold ${isSocketConnected ? 'text-accentLight' : 'text-textMuted'}`}>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-bgDark/50 border border-borderDark rounded-lg p-3 flex flex-col gap-1">
+              <span className="text-[11px] font-medium text-textMuted">Status</span>
+              <span className={`text-lg font-semibold ${isSocketConnected ? 'text-textMain' : 'text-textMuted'}`}>
                 {socketStatus.text.toUpperCase()}
               </span>
             </div>
-            <div className="bg-bgPanel/40 border-2 border-borderDark p-3 flex flex-col gap-1">
-              <span className="text-[10px] uppercase font-bold text-textMuted">LISTEN EVENTS RECVD</span>
-              <span className="text-xl font-bold text-accentLight flex items-center gap-1">
+            <div className="bg-bgDark/50 border border-borderDark rounded-lg p-3 flex flex-col gap-1">
+              <span className="text-[11px] font-medium text-textMuted">Events received</span>
+              <span className="text-lg font-semibold text-textMain flex items-center gap-1">
                 <Activity className="w-4 h-4" /> {listenEventsCount}
               </span>
             </div>
-            <div className="bg-bgPanel/40 border-2 border-borderDark p-3 flex flex-col gap-1">
-              <span className="text-[10px] uppercase font-bold text-textMuted">TOTAL CONNECTION LOGS</span>
-              <span className="text-xl font-bold text-accentLight flex items-center gap-1">
+            <div className="bg-bgDark/50 border border-borderDark rounded-lg p-3 flex flex-col gap-1">
+              <span className="text-[11px] font-medium text-textMuted">Connection logs</span>
+              <span className="text-lg font-semibold text-textMain flex items-center gap-1">
                 <Cpu className="w-4 h-4" /> {totalSocketLogs}
               </span>
             </div>
-            <div className="bg-bgPanel/40 border-2 border-borderDark p-3 flex flex-col gap-1">
-              <span className="text-[10px] uppercase font-bold text-textMuted">ERRORS ENCOUNTERED</span>
-              <span className={`text-xl font-bold flex items-center gap-1 ${socketErrorCount > 0 ? 'text-textMain' : 'text-accentLight'}`}>
+            <div className="bg-bgDark/50 border border-borderDark rounded-lg p-3 flex flex-col gap-1">
+              <span className="text-[11px] font-medium text-textMuted">Errors</span>
+              <span className={`text-lg font-semibold flex items-center gap-1 ${socketErrorCount > 0 ? 'text-textMain' : 'text-textMain'}`}>
                 <ShieldAlert className="w-4 h-4" /> {socketErrorCount}
               </span>
             </div>
           </div>
 
-          <div className="mt-2 flex flex-col gap-2">
-            <span className="text-[10px] uppercase font-bold text-textMuted">CURRENT SOCKET HOST</span>
-            <div className="bg-bgPanel/40 border-2 border-borderDark p-3 text-xs text-accentLight overflow-x-auto whitespace-nowrap">
-              {(connectionLogs.length > 0 && connectionLogs[connectionLogs.length - 1]?.message?.includes('http')) 
-                ? connectionLogs[connectionLogs.length - 1].message 
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-medium text-textMuted">Current host</span>
+            <div className="bg-bgDark/50 border border-borderDark rounded-lg p-2.5 text-sm text-textMain font-mono overflow-x-auto whitespace-nowrap">
+              {(connectionLogs.length > 0 && connectionLogs[connectionLogs.length - 1]?.message?.includes('http'))
+                ? connectionLogs[connectionLogs.length - 1].message
                 : 'No active URI logged or disconnected'}
             </div>
           </div>
 
-          {/* Health bar */}
-          <div className="mt-4 flex flex-col gap-1">
-            <div className="flex justify-between text-[10px] uppercase font-bold text-textMuted">
-              <span>Connection Health</span>
-              <span>{isSocketConnected ? (socketErrorCount > 0 ? 'UNSTABLE' : 'STABLE') : 'OFFLINE'}</span>
+          <div className="flex flex-col gap-1">
+            <div className="flex justify-between text-[11px] font-medium text-textMuted">
+              <span>Connection health</span>
+              <span>{isSocketConnected ? (socketErrorCount > 0 ? 'Unstable' : 'Stable') : 'Offline'}</span>
             </div>
-            <div className="w-full h-4 bg-bgPanel/40 border-2 border-borderDark flex">
-              <div 
-                className={`h-full transition-all ${isSocketConnected ? 'bg-textMain w-full' : 'bg-transparent w-0'}`} 
+            <div className="w-full h-2 bg-bgDark/60 border border-borderDark rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${isSocketConnected ? 'bg-textMain w-full' : 'bg-transparent w-0'}`}
               />
             </div>
           </div>

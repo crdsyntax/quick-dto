@@ -46,7 +46,6 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
 
   const isConnected = socketStatus.className === SocketStatusClass.CONNECTED;
 
-  // Sync state upward
   useEffect(() => {
     onStateChange({
       url,
@@ -59,7 +58,6 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
     });
   }, [url, path, token, userId, eventName, payload, transportMode]);
 
-  // Load external state ONLY when loadId changes
   useEffect(() => {
     if (initialState) {
       setUrl(initialState.url || 'http://localhost:3000');
@@ -68,7 +66,7 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
       setUserId(initialState.userId || '');
       setEventName(initialState.eventName || 'message');
       setPayload(initialState.payload || '{}');
-      
+
       const transports = initialState.transports || [];
       if (transports.length === 2) setTransportMode('auto');
       else if (transports[0] === 'websocket') setTransportMode('websocket');
@@ -90,58 +88,52 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-5 w-full">
-      <div className="grid grid-cols-1 lg:grid-cols-[290px_1fr] gap-5 w-full items-start">
+    <div className="flex flex-col gap-4 w-full">
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 w-full items-start">
         {/* Left Column: Config */}
-        <div className="bg-bgPanel/80 backdrop-blur-sm p-4 border-2 border-borderDark rounded-none flex flex-col gap-3.5">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-textMuted border-b-2 border-borderDark pb-2 flex items-center justify-between">
-            <span>&gt; SOCKET.IO CONFIG</span>
-            <span className="text-[9px] bg-accentLight text-bgDark px-1.5 rounded-none">V4.X+</span>
-          </h2>
+        <div className="bg-bgPanel/40 border border-borderDark rounded-lg p-4 flex flex-col gap-3 shadow-card">
+          <div className="flex items-center justify-between pb-2 border-b border-borderDark">
+            <span className="text-xs font-medium text-textMuted">Socket.IO config</span>
+            <span className="text-[10px] bg-bgDark text-textMuted border border-borderDark px-1.5 py-0.5 rounded">v4.x+</span>
+          </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold uppercase text-textMuted flex items-center justify-between">
-              URL
-              <span className="text-[8px] lowercase italic opacity-70">http://domain.com</span>
-            </label>
+            <label className="text-[11px] font-medium text-textMuted">URL</label>
             <input
               type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               disabled={isConnected}
               placeholder="http://localhost:3000"
-              className="p-1.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none disabled:opacity-50"
+              className="px-2.5 py-1.5 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors disabled:opacity-40 placeholder:text-textMuted/50"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold uppercase text-textMuted flex items-center justify-between">
-              PATH
-              <span className="text-[8px] lowercase italic opacity-70">default: /socket.io</span>
-            </label>
+            <label className="text-[11px] font-medium text-textMuted">Path</label>
             <input
               type="text"
               value={path}
               onChange={(e) => setPath(e.target.value)}
               disabled={isConnected}
               placeholder="/socket.io"
-              className="p-1.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none disabled:opacity-50"
+              className="px-2.5 py-1.5 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors disabled:opacity-40 placeholder:text-textMuted/50"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold uppercase text-textMuted">TRANSPORT PROTOCOL</label>
-            <div className="grid grid-cols-3 border-2 border-borderDark rounded-none overflow-hidden h-8">
+            <label className="text-[11px] font-medium text-textMuted">Transport</label>
+            <div className="flex gap-1 bg-bgDark border border-borderDark rounded-lg p-0.5">
               {(['auto', 'websocket', 'polling'] as const).map((mode) => (
                 <button
                   key={mode}
                   disabled={isConnected}
                   onClick={() => setTransportMode(mode)}
-                  className={`text-[9px] font-bold uppercase transition flex items-center justify-center ${
-                    transportMode === mode 
-                      ? 'bg-textMain text-bgDark' 
-                      : 'bg-bgDark text-textMuted hover:text-textMain'
-                  } disabled:opacity-50`}
+                  className={`flex-1 py-1 text-[11px] font-medium rounded-md transition-all ${
+                    transportMode === mode
+                      ? 'bg-bgPanel text-textMain shadow-card'
+                      : 'text-textMuted hover:text-textMain'
+                  } disabled:opacity-40`}
                 >
                   {mode}
                 </button>
@@ -150,177 +142,156 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold uppercase text-textMuted">AUTH TOKEN</label>
+            <label className="text-[11px] font-medium text-textMuted">Auth token</label>
             <input
               type="text"
               value={token}
               onChange={(e) => setToken(e.target.value)}
               disabled={isConnected}
-              placeholder="OPTIONAL TOKEN"
-              className="p-1.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none disabled:opacity-50"
+              placeholder="Optional token"
+              className="px-2.5 py-1.5 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors disabled:opacity-40 placeholder:text-textMuted/50"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold uppercase text-textMuted">USER ID</label>
+            <label className="text-[11px] font-medium text-textMuted">User ID</label>
             <input
               type="text"
               value={userId}
               onChange={(e) => setUserId(e.target.value)}
               disabled={isConnected}
-              placeholder="OPTIONAL USER ID"
-              className="p-1.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none disabled:opacity-50"
+              placeholder="Optional user ID"
+              className="px-2.5 py-1.5 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors disabled:opacity-40 placeholder:text-textMuted/50"
             />
           </div>
 
-          {/* Action Button & Status */}
-          <div className="flex flex-col gap-2.5 mt-3">
+          <div className="flex flex-col gap-2 mt-2">
             {!isConnected ? (
               <button
                 onClick={handleConnect}
-                className="py-2 w-full bg-bgDark border-2 border-textMain text-textMain hover:bg-textMain hover:text-bgDark font-bold rounded-none text-[10px] uppercase flex items-center justify-center gap-2 transition"
+                className="py-2 w-full bg-bgDark border border-textMain text-textMain hover:bg-textMain hover:text-bgDark transition-colors rounded-lg text-xs font-semibold flex items-center justify-center gap-2"
               >
                 <Power className="w-3.5 h-3.5" />
-                CONNECT
+                Connect
               </button>
             ) : (
               <button
                 onClick={onDisconnect}
-                className="py-2 w-full bg-bgDark border-2 border-accentLight text-accentLight hover:bg-accentLight hover:text-bgDark font-bold rounded-none text-[10px] uppercase flex items-center justify-center gap-2 transition"
+                className="py-2 w-full bg-bgDark border border-textMain text-textMain hover:bg-textMain hover:text-bgDark transition-colors rounded-lg text-xs font-semibold flex items-center justify-center gap-2"
               >
                 <Power className="w-3.5 h-3.5" />
-                DISCONNECT
+                Disconnect
               </button>
             )}
 
-            <div
-              className={`w-full text-center py-1.5 px-2 border-2 rounded-none text-[10px] font-bold uppercase tracking-wider ${
-                isConnected ? 'border-textMain text-accentLight bg-bgDark' : 'border-borderDark text-textMuted'
-              }`}
-            >
-              STATUS: {socketStatus.text}
+            <div className={`w-full text-center py-1.5 px-2 rounded-lg text-xs font-medium border transition-colors ${
+              isConnected ? 'border-textMain/50 text-textMain bg-bgDark/60' : 'border-borderDark text-textMuted bg-bgDark/30'
+            }`}>
+              Status: {socketStatus.text}
             </div>
           </div>
         </div>
 
         {/* Right Column: Interaction area */}
-        <div className="flex flex-col bg-bgDark/60 backdrop-blur-sm border-2 border-borderDark rounded-none overflow-hidden min-h-[450px]">
+        <div className="flex flex-col bg-bgPanel/20 border border-borderDark rounded-lg overflow-hidden shadow-card min-h-[400px]">
           {/* Sub tabs header */}
-          <div className="flex bg-bgPanel/40 border-b-2 border-borderDark">
-            <button
-              onClick={() => setActiveTab('emit')}
-              className={`flex-1 py-2.5 text-[10px] font-bold uppercase transition border-b-2 tracking-wider ${
-                activeTab === 'emit'
-                  ? 'border-textMain text-accentLight bg-bgDark'
-                  : 'border-transparent text-textMuted hover:text-textMain'
-              }`}
-            >
-              EMIT EVENT
-            </button>
-            <button
-              onClick={() => setActiveTab('listen')}
-              className={`flex-1 py-2.5 text-[10px] font-bold uppercase transition border-b-2 tracking-wider ${
-                activeTab === 'listen'
-                  ? 'border-textMain text-accentLight bg-bgDark'
-                  : 'border-transparent text-textMuted hover:text-textMain'
-              }`}
-            >
-              LISTEN EVENT
-            </button>
-            <button
-              onClick={() => setActiveTab('logs')}
-              className={`flex-1 py-2.5 text-[10px] font-bold uppercase transition border-b-2 tracking-wider ${
-                activeTab === 'logs'
-                  ? 'border-textMain text-accentLight bg-bgDark'
-                  : 'border-transparent text-textMuted hover:text-textMain'
-              }`}
-            >
-              SOCKET LOGS
-            </button>
+          <div className="flex gap-1 bg-bgPanel/30 border-b border-borderDark p-2">
+            {(['emit', 'listen', 'logs'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  activeTab === tab
+                    ? 'bg-bgDark text-textMain shadow-card'
+                    : 'text-textMuted hover:text-textMain'
+                }`}
+              >
+                {tab === 'emit' ? 'Emit event' : tab === 'listen' ? 'Listen event' : 'Socket logs'}
+              </button>
+            ))}
           </div>
 
           {/* Sub tab content */}
           <div className="p-4 flex-grow flex flex-col">
             {/* Tab: Emit */}
             {activeTab === 'emit' && (
-              <div className="flex flex-col gap-3.5 flex-grow">
+              <div className="flex flex-col gap-3 flex-grow">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold uppercase text-textMuted">EVENT NAME</label>
+                  <label className="text-xs font-medium text-textMuted">Event name</label>
                   <input
                     type="text"
                     value={eventName}
                     onChange={(e) => setEventName(e.target.value)}
                     placeholder="e.g. newMessage"
-                    className="p-2 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none"
+                    className="px-3 py-1.5 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors placeholder:text-textMuted/50"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1 flex-grow">
-                  <label className="text-[10px] font-bold uppercase text-textMuted">PAYLOAD (JSON)</label>
+                  <label className="text-xs font-medium text-textMuted">Payload (JSON)</label>
                   <textarea
                     value={payload}
                     onChange={(e) => setPayload(e.target.value)}
                     placeholder="{}"
-                    className="w-full flex-grow min-h-[180px] p-2.5 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none resize-y"
+                    className="w-full flex-grow min-h-[180px] px-3 py-2 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain font-mono focus:border-textMuted transition-colors resize-y placeholder:text-textMuted/50"
                   />
                 </div>
 
                 <button
                   onClick={() => onEmit(eventName, payload)}
                   disabled={!isConnected}
-                  className="mt-2 py-2 px-4 bg-bgDark border-2 border-textMain text-textMain hover:bg-textMain hover:text-bgDark disabled:opacity-50 transition font-bold rounded-none text-[10px] uppercase flex items-center justify-center gap-1.5"
+                  className="mt-1 py-2 px-4 bg-bgDark border border-textMain text-textMain hover:bg-textMain hover:text-bgDark disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 self-start"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  EMIT EVENT
+                  Emit event
                 </button>
               </div>
             )}
 
             {/* Tab: Listen */}
             {activeTab === 'listen' && (
-              <div className="flex flex-col gap-3.5 flex-grow">
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_100px_100px] gap-2.5 items-end">
+              <div className="flex flex-col gap-3 flex-grow">
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_100px_100px] gap-2 items-end">
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-bold uppercase text-textMuted">EVENT NAME LISTENER</label>
+                    <label className="text-xs font-medium text-textMuted">Event name</label>
                     <input
                       type="text"
                       value={listenEventName}
                       onChange={(e) => setListenEventName(e.target.value)}
                       placeholder="e.g. message"
-                      className="p-2 bg-bgDark border-2 border-borderDark text-textMain rounded-none text-xs focus:border-accentLight focus:outline-none"
+                      className="px-3 py-1.5 bg-bgDark border border-borderDark rounded-lg text-sm text-textMain focus:border-textMuted transition-colors placeholder:text-textMuted/50"
                     />
                   </div>
                   <button
                     onClick={() => onListen(listenEventName)}
                     disabled={!isConnected}
-                    className="py-2 bg-bgDark border-2 border-textMain text-textMain hover:bg-textMain hover:text-bgDark disabled:opacity-50 transition font-bold rounded-none text-[10px] uppercase flex items-center justify-center gap-1"
+                    className="py-1.5 bg-bgDark border border-textMain text-textMain hover:bg-textMain hover:text-bgDark disabled:opacity-40 transition-colors rounded-lg text-xs font-semibold flex items-center justify-center gap-1"
                   >
                     <Radio className="w-3.5 h-3.5" />
-                    ESCUCHAR
+                    Listen
                   </button>
                   <button
                     onClick={onClearListenLogs}
                     disabled={listenLogs.length === 0}
-                    className="py-2 bg-bgDark border-2 border-borderDark hover:border-textMain disabled:opacity-40 text-textMain transition font-bold rounded-none text-[10px] uppercase flex items-center justify-center gap-1"
+                    className="py-1.5 bg-bgDark border border-borderDark text-textMuted hover:border-textMuted disabled:opacity-40 transition-colors rounded-lg text-xs font-medium flex items-center justify-center gap-1"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    LIMPIAR
+                    Clear
                   </button>
                 </div>
 
-                {/* Logs area */}
-                <div className="border-2 border-borderDark rounded-none bg-bgDark/40 flex-grow h-[240px] overflow-y-auto p-3.5 flex flex-col gap-2 text-[11px]">
+                <div className="border border-borderDark rounded-lg bg-bgDark/40 flex-grow h-[240px] overflow-y-auto p-3.5 flex flex-col gap-2 text-xs">
                   {listenLogs.length === 0 ? (
-                    <div className="text-textMuted italic text-center my-auto flex flex-col items-center justify-center gap-2 font-bold uppercase opacity-60">
-                      <Radio className="w-5 h-5 animate-pulse" />
-                      ESCUCHANDO...
+                    <div className="text-textMuted italic text-center my-auto flex flex-col items-center justify-center gap-2 font-medium opacity-60">
+                      <Radio className="w-5 h-5" />
+                      Listening...
                     </div>
                   ) : (
                     listenLogs.map((log, i) => (
-                      <div key={i} className="border-b border-borderDark pb-2">
-                        <span className="text-textMuted">[{log.time}]</span>{' '}
-                        <span className="text-accentLight font-bold">[EVENT: {log.eventName}]</span>
-                        <pre className="text-textMain mt-1 pl-3 whitespace-pre-wrap">{log.message}</pre>
+                      <div key={i} className="border-b border-borderDark/50 pb-1.5 last:border-0">
+                        <span className="text-textMuted text-[11px]">[{log.time}]</span>{' '}
+                        <span className="text-textMain font-medium text-[11px]">[Event: {log.eventName}]</span>
+                        <pre className="text-textMain text-xs mt-0.5 pl-3 whitespace-pre-wrap font-mono">{log.message}</pre>
                       </div>
                     ))
                   )}
@@ -330,43 +301,42 @@ export const SocketPanel: React.FC<SocketPanelProps> = ({
 
             {/* Tab: Logs */}
             {activeTab === 'logs' && (
-              <div className="flex flex-col gap-3.5 flex-grow">
-                <div className="flex justify-between items-center gap-2">
-                  <h3 className="text-[10px] font-bold uppercase text-textMuted">CONNECTION LOGS</h3>
+              <div className="flex flex-col gap-3 flex-grow">
+                <div className="flex justify-between items-center">
+                  <p className="text-xs font-medium text-textMuted">Connection logs</p>
                   <div className="flex gap-2">
                     {onExportJson && (
                       <button
                         type="button"
                         onClick={onExportJson}
                         disabled={connectionLogs.length === 0 && listenLogs.length === 0}
-                        className="py-1 px-2.5 bg-bgPanel/40 border-2 border-borderDark hover:border-textMain disabled:opacity-40 text-textMain transition font-bold rounded-none text-[9px] uppercase flex items-center gap-1"
+                        className="py-1 px-2.5 bg-bgDark/40 border border-borderDark hover:border-textMuted disabled:opacity-40 text-textMain transition-colors rounded-lg text-[11px] font-medium flex items-center gap-1"
                       >
-                        <Download className="w-3 h-3" /> EXPORT JSON
+                        <Download className="w-3 h-3" /> Export JSON
                       </button>
                     )}
                     <button
                       onClick={onClearConnectionLogs}
                       disabled={connectionLogs.length === 0}
-                      className="py-1 px-2.5 bg-bgPanel/40 border-2 border-borderDark hover:border-textMain disabled:opacity-40 text-textMain transition font-bold rounded-none text-[9px] uppercase flex items-center gap-1"
+                      className="py-1 px-2.5 bg-bgDark/40 border border-borderDark hover:border-textMuted disabled:opacity-40 text-textMain transition-colors rounded-lg text-[11px] font-medium flex items-center gap-1"
                     >
-                      <Trash2 className="w-3 h-3" /> LIMPIAR
+                      <Trash2 className="w-3 h-3" /> Clear
                     </button>
                   </div>
                 </div>
 
-                {/* Logs area */}
-                <div className="border-2 border-borderDark rounded-none bg-bgDark/40 flex-grow h-[240px] overflow-y-auto p-3.5 flex flex-col gap-1.5 text-[11px] text-textMain">
+                <div className="border border-borderDark rounded-lg bg-bgDark/40 flex-grow h-[240px] overflow-y-auto p-3.5 flex flex-col gap-1.5 text-xs text-textMain">
                   {connectionLogs.length === 0 ? (
-                    <div className="text-textMuted italic text-center my-auto flex flex-col items-center justify-center gap-2 uppercase font-bold opacity-60">
+                    <div className="text-textMuted italic text-center my-auto flex flex-col items-center justify-center gap-2 font-medium opacity-60">
                       <Terminal className="w-5 h-5" />
-                      NO LOGS.
+                      No logs.
                     </div>
                   ) : (
                     connectionLogs.map((log, i) => (
-                      <div key={i} className={`py-1 border-b border-borderDark last:border-b-0 ${
-                        log.type === 'error' ? 'text-accentLight border-l-2 border-l-textMain pl-2' : 'text-textMain'
+                      <div key={i} className={`py-1 border-b border-borderDark/50 last:border-0 ${
+                        log.type === 'error' ? 'text-textMain pl-2 border-l-2 border-l-textMain' : 'text-textMain'
                       }`}>
-                        <span className="text-textMuted mr-2">[{log.time}]</span>
+                        <span className="text-textMuted mr-1">[{log.time}]</span>
                         {log.message}
                       </div>
                     ))
