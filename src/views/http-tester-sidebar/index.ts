@@ -275,7 +275,7 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
       async (msg: WebviewMessage) => {
         try {
           if (msg.command === "sendRequest") {
-            const { HttpTesterPanel } = require("./http-tester.view");
+            
             const panel = HttpTesterPanel.createOrShow(
               this._extensionUri,
               this._context,
@@ -288,7 +288,17 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
               });
             }, 1000);
           } else if (msg.command === "openInEditor") {
-            vscode.commands.executeCommand("nest-tools.openHttpTesterNewTab");
+            if (msg.collection) {
+              const panel = HttpTesterPanel.createOrShow(
+                this._extensionUri,
+                this._context,
+              );
+              setTimeout(() => {
+                panel.loadCollection(msg.collection as HttpCollection);
+              }, 1000);
+            } else {
+              vscode.commands.executeCommand("nest-tools.openHttpTesterNewTab");
+            }
           } else if (msg.command === "saveCollection") {
             const currentCollections = this._loadGlobalCollections();
             const newCollection = msg.collection as HttpCollection;
@@ -296,7 +306,7 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
               newCollection,
             ]);
 
-            const { HttpTesterPanel } = require("./http-tester.view");
+            
             await HttpTesterPanel.saveCollections(
               this._context,
               updatedCollections,
@@ -353,7 +363,7 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
             if (msg.command === "updateGlobalToken") {
               vscode.window.showInformationMessage("Token Global actualizado");
             }
-            const { HttpTesterPanel } = require("./http-tester.view");
+            
             HttpTesterPanel.panels.forEach((panel: any) => {
               panel._panel.webview.postMessage({
                 command: "loadGlobalToken",
@@ -371,7 +381,7 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
               "httpTester.globalRefreshToken",
               msg.token as string,
             );
-            const { HttpTesterPanel } = require("./http-tester.view");
+            
             HttpTesterPanel.panels.forEach((panel: any) => {
               panel._panel.webview.postMessage({
                 command: "loadGlobalRefreshToken",
@@ -400,7 +410,7 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
               const updatedCollections = isAll
                 ? []
                 : currentCollections.filter((c) => c.type !== filterType);
-              const { HttpTesterPanel } = require("./http-tester.view");
+              
               await HttpTesterPanel.saveCollections(
                 this._context,
                 updatedCollections,
@@ -426,7 +436,7 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
               const updatedCollections = currentCollections.filter(
                 (c) => !(c.name === msg.name && c.type === msg.type),
               );
-              const { HttpTesterPanel } = require("./http-tester.view");
+              
               await HttpTesterPanel.saveCollections(
                 this._context,
                 updatedCollections,
@@ -494,7 +504,7 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
         filteredCollections,
       );
 
-      const { HttpTesterPanel } = require("./http-tester.view");
+      
       await HttpTesterPanel.saveCollections(this._context, updatedCollections);
 
       vscode.window.showInformationMessage(
@@ -569,7 +579,7 @@ export class HttpTesterSidebarProvider implements vscode.WebviewViewProvider {
         collections,
       );
 
-      const { HttpTesterPanel } = require("./http-tester.view");
+      
       await HttpTesterPanel.saveCollections(this._context, updatedCollections);
 
       vscode.window.showInformationMessage(

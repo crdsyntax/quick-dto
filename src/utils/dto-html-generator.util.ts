@@ -1,19 +1,42 @@
-import { 
-  CLASS_VALIDATOR_DECORATORS, 
-  SWAGGER_DECORATORS, 
-  CLASS_TRANSFORMER_DECORATORS, 
-  PROPERTY_TEMPLATES 
+import {
+  CLASS_VALIDATOR_DECORATORS,
+  CLASS_TRANSFORMER_DECORATORS,
 } from "../constants/dto-sidebar.constants";
+
+const BUILDER_SWAGGER = ["ApiProperty", "ApiPropertyOptional", "ApiHideProperty"];
+
+const PROPERTY_TYPES = [
+  "string",
+  "number",
+  "boolean",
+  "Date",
+  "object",
+  "any",
+  "unknown",
+  "string[]",
+  "number[]",
+  "any[]",
+  "Record<string, any>",
+];
+
+const optionList = (items: string[], placeholder: string): string =>
+  `<option value="">${placeholder}</option>` +
+  items.map((i) => `<option value="${i.replace(/"/g, "&quot;")}">${i}</option>`).join("");
 
 export class DtoHtmlGenerator {
   public static generate(): string {
-    const makeItemHtml = (name: string, snippet: string) => 
-      `<div class="item" draggable="true" data-snippet="${snippet.replace(/"/g, '&quot;')}">${name}</div>`;
-
-    const validatorHtml = CLASS_VALIDATOR_DECORATORS.map((d) => makeItemHtml(d, `@${d}\n`)).join('');
-    const swaggerHtml = SWAGGER_DECORATORS.map((d) => makeItemHtml(d, `@${d}\n`)).join('');
-    const transformerHtml = CLASS_TRANSFORMER_DECORATORS.map((d) => makeItemHtml(d, `@${d}\n`)).join('');
-    const templatesHtml = PROPERTY_TEMPLATES.map(p => makeItemHtml(p.name, p.snippet)).join('');
+    const validatorHtml = CLASS_VALIDATOR_DECORATORS.map(
+      (d) =>
+        `<label class="check"><input type="checkbox" data-validator value="${d.replace(/"/g, "&quot;")}" /><span>${d}</span></label>`
+    ).join("");
+    const swaggerHtml = optionList(BUILDER_SWAGGER, "Selecciona swagger…");
+    const transformerHtml = optionList(
+      CLASS_TRANSFORMER_DECORATORS,
+      "Selecciona transformer…"
+    );
+    const typeHtml = PROPERTY_TYPES.map(
+      (i) => `<option value="${i}">${i}</option>`
+    ).join("");
 
     return `<!doctype html>
 <html lang="en">
@@ -21,92 +44,191 @@ export class DtoHtmlGenerator {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding:8px }
-    .section { margin-bottom: 12px }
-    .item { padding:6px; border-radius:4px; background:var(--vscode-sideBar-background); cursor:grab; margin:4px 0 }
-    .item:active { cursor:grabbing }
-    .columns { display:flex; gap:12px }
-    .col { flex:1; min-width:120px }
-    .col h4 { margin:4px 0 }
-    button { margin-top:8px }
-    .sub { padding-left:8px; margin-top:6px }
+    body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding:10px }
+    h3 { margin: 0 0 4px; font-size: 13px }
+    .hint { font-size: 11px; color: var(--vscode-descriptionForeground); margin-bottom: 10px }
+    .builder { display: flex; flex-direction: column; gap: 10px }
+    .row { display: flex; flex-direction: column; gap: 3px }
+    .row label { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--vscode-descriptionForeground) }
+    select, input {
+      width: 100%;
+      padding: 6px 8px;
+      background: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border: 1px solid var(--vscode-input-border);
+      border-radius: 4px;
+      font-size: 12px;
+      box-sizing: border-box;
+    }
+    .checklist {
+      max-height: 150px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      background: var(--vscode-input-background);
+      border: 1px solid var(--vscode-input-border);
+      border-radius: 4px;
+      padding: 5px;
+    }
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 1px 2px;
+      border-radius: 3px;
+    }
+    .check:hover { background: var(--vscode-list-hoverBackground) }
+    .check input {
+      width: auto;
+      margin: 0;
+      cursor: pointer;
+      accent-color: var(--vscode-focusBorder);
+    }
+    .check span { font-family: var(--vscode-editor-font-family, monospace) }
+    .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
+    #propForm { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--vscode-panel-border) }
+    button {
+      padding: 8px 12px;
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    button:hover { background: var(--vscode-button-hoverBackground) }
+    button:disabled { opacity: 0.5; cursor: not-allowed }
+    .preview {
+      font-family: var(--vscode-editor-font-family, monospace);
+      font-size: 11px;
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      padding: 8px;
+      white-space: pre;
+      color: var(--vscode-textPreformat-foreground);
+      margin-top: 4px;
+    }
   </style>
 </head>
 <body>
-  <div class="section">
-    <h3>DTO Properties</h3>
-    <div class="columns">
-      <div class="col">
-        <h4>class-validator</h4>
-        ${validatorHtml}
+  <h3>Constructor de Propiedades DTO</h3>
+  <div class="hint">Selecciona ApiProperty, uno o varios validadores de class-validator y opcionalmente un transformer. Luego indica el nombre y tipo, y envíalo al cursor del editor.</div>
+
+  <div class="builder">
+    <div class="cols">
+      <div class="row">
+        <label>@nestjs/swagger</label>
+        <select id="selSwagger">${swaggerHtml}</select>
       </div>
-      <div class="col">
-        <h4>@nestjs/swagger</h4>
-        ${swaggerHtml}
+      <div class="row">
+        <label>class-validator (varios)</label>
+        <div id="validatorList" class="checklist">${validatorHtml}</div>
       </div>
-      <div class="col">
-        <h4>class-transformer</h4>
-        ${transformerHtml}
+      <div class="row">
+        <label>class-transformer</label>
+        <select id="selTransformer">${transformerHtml}</select>
       </div>
-      <div class="col">
-        <h4>Property Snippets</h4>
-        ${templatesHtml}
+      <div class="row">
+        <label>Tipo</label>
+        <select id="propType">${typeHtml}</select>
       </div>
     </div>
-    <div style="margin-top:8px">
-      <button id="insertBtn">Insert selected into active editor</button>
+
+    <div id="propForm">
+      <div class="row">
+        <label>Nombre de la propiedad</label>
+        <input id="propName" type="text" placeholder="ej. email" autocomplete="off" />
+      </div>
+      <div id="preview" class="preview"></div>
+      <button id="sendBtn" disabled>Enviar al código</button>
     </div>
   </div>
 
   <script>
     const vscode = acquireVsCodeApi();
-    let lastSnippet = null;
 
-    document.querySelectorAll('.item').forEach(it => {
-      it.addEventListener('click', () => {
-        document.querySelectorAll('.item').forEach(i => i.style.outline = '');
-        it.style.outline = '2px solid var(--vscode-focusBorder)';
-        lastSnippet = it.getAttribute('data-snippet');
-      });
-      it.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('text/plain', it.getAttribute('data-snippet'));
-      });
+    const selSwagger = document.getElementById('selSwagger');
+    const validatorList = document.getElementById('validatorList');
+    const selTransformer = document.getElementById('selTransformer');
+    const propType = document.getElementById('propType');
+    const propName = document.getElementById('propName');
+    const sendBtn = document.getElementById('sendBtn');
+    const preview = document.getElementById('preview');
+
+    const getValidators = () =>
+      Array.from(validatorList.querySelectorAll('input[data-validator]:checked')).map(
+        (c) => c.value
+      );
+
+    const hasSelection = () =>
+      selSwagger.value || getValidators().length > 0 || selTransformer.value;
+
+    const buildSnippet = () => {
+      const decorators = [];
+      if (selSwagger.value) decorators.push('@' + selSwagger.value + '()');
+      getValidators().forEach((v) => decorators.push('@' + v));
+      if (selTransformer.value) decorators.push('@' + selTransformer.value);
+      const name = propName.value.trim();
+      if (!name) return decorators.join('\\n');
+      return decorators.join('\\n') + '\\n' + name + ': ' + propType.value + ';';
+    };
+
+    const update = () => {
+      const name = propName.value.trim();
+      const snippet = hasSelection() ? buildSnippet() : '';
+      preview.textContent = snippet;
+      preview.style.display = snippet ? 'block' : 'none';
+      sendBtn.disabled = !name || !hasSelection();
+    };
+
+    [selSwagger, selTransformer, propType].forEach((el) =>
+      el.addEventListener('change', update)
+    );
+    validatorList.addEventListener('change', (e) => {
+      if (e.target && e.target.matches && e.target.matches('input[data-validator]')) update();
     });
+    propName.addEventListener('input', update);
 
-    document.getElementById('insertBtn').addEventListener('click', () => {
-      if (!lastSnippet) {
-        vscode.postMessage({ command: 'showWarning', text: 'Seleccione un decorador o plantilla para insertar.' });
+    sendBtn.addEventListener('click', () => {
+      const name = propName.value.trim();
+      if (!hasSelection()) {
+        vscode.postMessage({ command: 'showWarning', text: 'Selecciona al menos un decorador.' });
+        return;
+      }
+      if (!name) {
+        vscode.postMessage({ command: 'showWarning', text: 'Ingresa el nombre de la propiedad.' });
         return;
       }
 
+      const snippet = buildSnippet();
+
+      // Determinar imports necesarios a partir de los decoradores usados
       const imports = { classValidator: [], swagger: [], transformer: [] };
-      const s = lastSnippet;
-      const matches = Array.from(s.matchAll(/@([A-Za-z0-9_]+)/g)).map(m => m[1]);
-      for (const name of matches) {
-        if (/^Is|^Validate|^Length|^Min|^Max|^Matches|^Is/.test(name)) {
-          imports.classValidator.push(name);
+      const matches = Array.from(snippet.matchAll(/@([A-Za-z0-9_]+)/g)).map((m) => m[1]);
+      for (const dec of matches) {
+        if (/^Is|^Validate|^Length|^Min|^Max|^Matches/.test(dec)) {
+          imports.classValidator.push(dec);
         }
-        if (/^Api/.test(name)) {
-          imports.swagger.push(name);
+        if (/^Api/.test(dec)) {
+          imports.swagger.push(dec);
         }
-        if (/^Expose$|^Exclude$|^Type$|^Transform$/.test(name)) {
-          imports.transformer.push(name);
+        if (/^Expose$|^Exclude$|^Type$|^Transform$/.test(dec)) {
+          imports.transformer.push(dec);
         }
       }
-
       imports.classValidator = [...new Set(imports.classValidator)];
       imports.swagger = [...new Set(imports.swagger)];
       imports.transformer = [...new Set(imports.transformer)];
 
-      vscode.postMessage({ command: 'insertSnippet', snippet: lastSnippet, imports });
+      vscode.postMessage({ command: 'insertSnippet', snippet, imports });
     });
 
-    window.addEventListener('message', event => {
-      const msg = event.data;
-      if (msg.command === 'setSnippet') {
-        lastSnippet = msg.snippet;
-      }
-    });
+    update();
   </script>
 </body>
 </html>`;

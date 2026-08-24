@@ -20,7 +20,6 @@ import {
   EntityItem,
 } from "./views/entity-tree-provider";
 import { EntityVisualizer } from "./views/erd-visualizer";
-import { SocketTesterViewProvider } from "./views/socketView";
 import { DtoSidebarProvider } from "./views/dto-sidebar.view";
 import {
   closeHttpTesterCommand,
@@ -28,6 +27,7 @@ import {
 } from "./commands/http-tester.command";
 import { HttpTesterSidebarProvider } from "./views/http-tester-sidebar";
 import { addLoggerDebugCommand } from "./commands/logger.command";
+import { completeClassValidatorCommand } from "./commands/complete-class-validator.command";
 import { createAutoCommitService } from "./commands/auto-commit.command";
 import { generateCollectionsFromControllerCommand } from "./commands/generate-collection.command";
 import { HttpTesterPanel } from "./views/http-tester.view";
@@ -180,14 +180,6 @@ export function activate(context: vscode.ExtensionContext) {
     ),
   );
 
-  const socketProvider = new SocketTesterViewProvider(context.extensionUri);
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(
-      SocketTesterViewProvider.viewId,
-      socketProvider,
-    ),
-  );
-
   const dtoProvider = new DtoSidebarProvider(context.extensionUri);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
@@ -223,6 +215,10 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "nest-tools.addLoggerDebug",
       addLoggerDebugCommand,
+    ),
+    vscode.commands.registerCommand(
+      "nest-tools.completeClassValidator",
+      completeClassValidatorCommand,
     ),
     vscode.commands.registerCommand(
       "nest-dto-generator.generateDto",
@@ -279,11 +275,6 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       "nest-tools.generateErd",
       generateErdCommand,
-    ),
-    vscode.commands.registerCommand("socketTester.connect", () =>
-      vscode.commands.executeCommand(
-        "workbench.view.extension.socketTesterView",
-      ),
     ),
     vscode.commands.registerCommand(
       "nest-tools.viewEntityErd",
